@@ -94,12 +94,12 @@ def create_fill(my_time, my_side, btc_price, btc_val, usd_val):
 
 
 def prep_data(raw_data, start_time, end_time):
-    raw_data = pd.read_csv('~/coinbase_data.csv')
+    #raw_data = pd.read_csv('~/coinbase_data.csv')
     raw_data['time'] = pd.to_datetime(raw_data.time)
     trimmed_df = raw_data[raw_data.time >= start_time]
     trimmed_df = trimmed_df[trimmed_df.time <= end_time]
     trimmed_df = trimmed_df.reset_index(drop = True)
-    day_df = trimmed_df.groupby(trimmed_df['time'].dt.date).agg({'open':'first',  'high': max, 'low': min, 'close':'last', 'volumeto': sum, 'volumefrom': sum,}).reset_index()
+    day_df = trimmed_df.groupby(trimmed_df['time'].dt.date).agg({'open':'first',  'high': max, 'low': min, 'close':'last',}).reset_index()
     return(day_df, trimmed_df)
 
 
