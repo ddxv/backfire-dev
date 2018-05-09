@@ -1,5 +1,6 @@
 import pandas as pd
 import ema_logic
+import numpy as np
 
 class AccountBalances:
     usd = 0
@@ -36,6 +37,9 @@ class BacktestSettings:
     sell_pct_btc = 0
     def set_sell_pct_btc(self, val):
         self.sell_pct_btc = val
+    principle_btc = 0
+    def set_principle_btc(self, val):
+        self.principle_btc = val
     principle_usd = 0
     def set_principle_usd(self, val):
         self.principle_usd = val
@@ -57,13 +61,13 @@ def run_backtest(df, desired_outputs, bt):
             value_usd = bt.buy_amt_usd
             value_btc = value_usd / price
             value_btc = value_btc - (value_btc * .001)
-            bal.sub_usd(value_usd)
             bal.add_btc(value_btc)
+            bal.sub_usd(value_usd)
             fills.append(create_fill(row[0], 'buy', price, value_btc, value_usd))
         if row[3] == 1 and bal.btc > bt.min_btc:
             price = row[1]
             value_btc = bal.btc * bt.sell_pct_btc
-            value_usd = price * bt.sell_pct_btc
+            value_usd = price * value_btc
             value_usd = value_usd - (value_usd * .001)
             bal.add_usd(value_usd)
             bal.sub_btc(value_btc)
@@ -109,6 +113,7 @@ def single_backtest(df, bt):
     hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
     df = ema_logic.set_signals(df, bt)
     results, my_fills = run_backtest(df, 'both', bt)
+    my_fills = fills_running_bal(my_fills, bt)
     results['hodl_roi'] = hodl_roi
     results['sd'] = df.time.min()
     results['ed'] = df.time.max()
@@ -132,5 +137,16 @@ def run_multi(df, my_result_type, bt, my_data):
     #result = {**pre_res_dict, **result}
     #uplift = (total_roi - hodl_roi) / hodl_roi
     return(result)
+
+
+def fills_running_bal(fills_df, bt):
+    fills_df['btc_val'] = np.where(fills_df['side'] == 'sell', fills_df['btc_val'] * -1, fills_df['btc_val'])
+    fills_df['usd_val'] = np.where(fills_df['side'] == 'buy', fills_df['usd_val'] * -1, fills_df['usd_val'])
+    fills_df['p_usd'] = bt.principle_usd
+    fills_df['p_btc'] = bt.principle_btc
+    fills_df['bal_usd'] = fills_df.usd_val.cumsum() + bt.principle_usd
+    fills_df['bal_btc'] = fills_df.btc_val.cumsum() + bt.principle_btc
+    fills_df['running_bal'] = (fills_df['bal_btc'] * fills_df['price']) + fills_df['bal_usd']
+    return(fills_df)
 
 
