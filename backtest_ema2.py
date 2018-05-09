@@ -112,7 +112,7 @@ def single_backtest(df, bt):
     hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
     df = ema_logic.set_signals(df, bt)
     results, my_fills = run_backtest(df, 'both', bt)
-    my_fills = fills_running(my_fills, bt)
+    my_fills = fills_running_bal(my_fills, bt)
     results['hodl_roi'] = hodl_roi
     results['sd'] = df.time.min()
     results['ed'] = df.time.max()
