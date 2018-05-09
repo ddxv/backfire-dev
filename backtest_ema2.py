@@ -36,6 +36,9 @@ class BacktestSettings:
     sell_pct_btc = 0
     def set_sell_pct_btc(self, val):
         self.sell_pct_btc = val
+    principle_btc = 0
+    def set_principle_btc(self, val):
+        self.principle_btc = val
     principle_usd = 0
     def set_principle_usd(self, val):
         self.principle_usd = val
