@@ -1,5 +1,6 @@
 import pandas as pd
 import ema_logic
+import numpy as np
 
 class AccountBalances:
     usd = 0
@@ -141,6 +142,8 @@ def run_multi(df, my_result_type, bt, my_data):
 def fills_running_bal(fills_df, bt):
     fills_df['btc_val'] = np.where(fills_df['side'] == 'sell', fills_df['btc_val'] * -1, fills_df['btc_val'])
     fills_df['usd_val'] = np.where(fills_df['side'] == 'buy', fills_df['usd_val'] * -1, fills_df['usd_val'])
+    fills_df['p_usd'] = bt.principle_usd
+    fills_df['p_btc'] = bt.principle_btc
     fills_df['bal_usd'] = fills_df.usd_val.cumsum() + bt.principle_usd
     fills_df['bal_btc'] = fills_df.btc_val.cumsum() + bt.principle_btc
     fills_df['running_bal'] = (fills_df['bal_btc'] * fills_df['price']) + fills_df['bal_usd']
