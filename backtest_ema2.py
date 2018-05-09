@@ -57,13 +57,13 @@ def run_backtest(df, desired_outputs, bt):
             value_usd = bt.buy_amt_usd
             value_btc = value_usd / price
             value_btc = value_btc - (value_btc * .001)
-            bal.sub_usd(value_usd)
             bal.add_btc(value_btc)
+            bal.sub_usd(value_usd)
             fills.append(create_fill(row[0], 'buy', price, value_btc, value_usd))
         if row[3] == 1 and bal.btc > bt.min_btc:
             price = row[1]
             value_btc = bal.btc * bt.sell_pct_btc
-            value_usd = price * bt.sell_pct_btc
+            value_usd = price * value_btc
             value_usd = value_usd - (value_usd * .001)
             bal.add_usd(value_usd)
             bal.sub_btc(value_btc)
