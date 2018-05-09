@@ -14,7 +14,6 @@ def backtest_set(raw_data, start_date, end_date):
     df = df[['close', 'time']]
     
     bt_vars = backtest_ema2.BacktestSettings()
-    bt_vars.set_min_usd(500)
     bt_vars.set_min_btc(.001)
     bt_vars.set_principle_usd(25000)
     
@@ -22,11 +21,12 @@ def backtest_set(raw_data, start_date, end_date):
     sell_amts = [(2 ** x) for x in range(7, 15)]
     upper_windows = [(2 ** x) for x in range(4, 13)]
     lower_windows = [(2 ** x) for x in range(4, 13)]
+    lower_factor_pcts = [(2 ** x) / 10000 for x in range(5, 10)]
+    upper_factor_pcts = [(2 ** x) / 1000 for x in range(4, 10)]
+
     #upper_windows = [1, 2]
     #lower_windows = [1, 2]
     #sell_amts = [1, 2]
-    lower_factor_pcts = [(2 ** x) / 1000 for x in range(4, 10)]
-    upper_factor_pcts = [(2 ** x) / 1000 for x in range(4, 10)]
 
     start = time.time()
     my_result_type = 'backtest'
@@ -112,7 +112,9 @@ kbest_means
 
 
 tosheet.insert_df(kbest_means, sheet_name, 'kbest_means', 0)
+
 tosheet.insert_df(kbest_scores, sheet_name, 'kbest_scores', 0)
+
 
 
 

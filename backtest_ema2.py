@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from copy import deepcopy
+import ema_logic.py
+
 
 class AccountBalances:
     usd = 0
@@ -57,6 +59,7 @@ def run_backtest(df, desired_outputs, bt):
             price = row[1]
             value_usd = bt.buy_amt_usd
             value_btc = value_usd / price
+            value_btc = value_btc - (value_btc * .001)
             bal.sub_usd(value_usd)
             bal.add_btc(value_btc)
             fills.append(create_fill(row[0], 'buy', price, value_btc, value_usd))
@@ -64,6 +67,7 @@ def run_backtest(df, desired_outputs, bt):
             price = row[1]
             value_btc = bal.btc * bt.sell_pct_btc
             value_usd = price * bt.sell_pct_btc
+            value_usd = value_usd - (value_usd * .001)
             bal.add_usd(value_usd)
             bal.sub_btc(value_btc)
             fills.append(create_fill(row[0], 'sell', price, value_btc, value_usd))
@@ -106,7 +110,7 @@ def single_backtest(df, bt):
     final_close = df.tail(2)[0:1]['close'].values[0]
     hodl_usd = (bt.principle_usd / df[0:1]['close'].values[0]) * final_close
     hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
-    df = set_signals(df, bt)
+    df = ema_logic.set_signals(df, bt)
     results, my_fills = run_backtest(df, 'both', bt)
     results['hodl_roi'] = hodl_roi
     results['sd'] = df.time.min()
@@ -114,17 +118,6 @@ def single_backtest(df, bt):
     results['final_bal'] = results['usd_bal'] + (final_close * results['btc_bal'])
     results['roi'] = (results['final_bal'] - bt.principle_usd) / bt.principle_usd
     return(df, results, my_fills)
-
-def set_signals(df, bt):
-    # When adjust is False, weighted averages are calculated recursively as:
-    # weighted_average[i] =  alpha * arg[i] + (1 - alpha) * weighted_average[i - 1]
-    upper_alpha = 2 / (bt.upper_window + 1)
-    lower_alpha = 2 / (bt.lower_window + 1)
-    df['upper_ema'] = (df.close * bt.factor_high).ewm(alpha = upper_alpha, adjust = False).mean()
-    df['lower_ema'] = (df.close * bt.factor_low).ewm(alpha = lower_alpha, adjust = False).mean()
-    df['buy_signal'] = np.where(((df.close < df.lower_ema) & (df.close.shift(1) > df.lower_ema.shift(1))), 1, 0)
-    df['sell_signal'] = np.where(((df.close > df.upper_ema) & (df.close.shift(1) < df.upper_ema.shift(1))), 1, 0)
-    return(df)
 
 def run_multi(df, my_result_type, bt, my_data):
     factor_low = 1 - my_data[0]
@@ -135,7 +128,8 @@ def run_multi(df, my_result_type, bt, my_data):
     bt.set_buy_amt_usd(my_data[3])
     bt.set_lower_window(my_data[4])
     bt.set_upper_window(my_data[5])
-    df = set_signals(df, bt)
+    bt.set_min_usd(my_data[3])
+    df = ema_logic.set_signals(df, bt)
     df = df[(df['sell_signal']==1) | (df['buy_signal'] == 1)]
     result = run_backtest(df, my_result_type, bt)
     #result = {**pre_res_dict, **result}
