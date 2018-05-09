@@ -112,6 +112,7 @@ def single_backtest(df, bt):
     hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
     df = ema_logic.set_signals(df, bt)
     results, my_fills = run_backtest(df, 'both', bt)
+    my_fills = fills_running(my_fills, bt)
     results['hodl_roi'] = hodl_roi
     results['sd'] = df.time.min()
     results['ed'] = df.time.max()
@@ -135,5 +136,14 @@ def run_multi(df, my_result_type, bt, my_data):
     #result = {**pre_res_dict, **result}
     #uplift = (total_roi - hodl_roi) / hodl_roi
     return(result)
+
+
+def fills_running_bal(fills_df, bt):
+    fills_df['btc_val'] = np.where(fills_df['side'] == 'sell', fills_df['btc_val'] * -1, fills_df['btc_val'])
+    fills_df['usd_val'] = np.where(fills_df['side'] == 'buy', fills_df['usd_val'] * -1, fills_df['usd_val'])
+    fills_df['bal_usd'] = fills_df.usd_val.cumsum() + bt.principle_usd
+    fills_df['bal_btc'] = fills_df.btc_val.cumsum() + bt.principle_btc
+    fills_df['running_bal'] = (fills_df['bal_btc'] * fills_df['price']) + fills_df['bal_usd']
+    return(fills_df)
 
 
