@@ -74,7 +74,7 @@ all_sets.to_csv(f'~/backfire/data/ema_five_set_{start_date}_2018-05-06.csv', ind
 
 
 top_1k_subset = all_sets.sort_values('roi', ascending = False).head(1000)
-tosheet.insert_df(top_1k_subset, sheet_name, 'top1k', 0)
+tosheet.insert_df(top_1k_subset, sheet_name, 'top1k_year', 0)
 
 positive_roi_subset = all_sets[all_sets['roi'] > 0]
 
@@ -91,7 +91,7 @@ arrayY = testdf.roi.values
 arrayX = testdf[feature_names].values
 
 # feature extraction
-k_num = 1
+k_num = 3
 #test = SelectPercentile(score_func = partial(mutual_info_regression, discrete_features = True))
 test = SelectKBest(score_func = partial(mutual_info_regression, discrete_features = True), k = k_num)
 fit = test.fit(arrayX, arrayY, )
@@ -118,6 +118,11 @@ tosheet.insert_df(kbest_scores, sheet_name, 'kbest_scores', 0)
 
 
 
+minute_df = pd.read_csv('~/backfire/data/coinbase_2014-12-01_2018-05-06.csv')
+
+minute_df = minute_df[minute_df.close != .06].reset_index(drop=True)
+
+minute_df.to_csv('~/backfire/data/coinbase_fixed_2014-12-01_2018-05-06.csv', index=False)
 
 
 
