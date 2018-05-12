@@ -56,7 +56,7 @@ def run_backtest(df, desired_outputs, bt):
     bal.set_usd(bt.principle_usd)
     fills = []
     for row in list(zip(df['time'], df['close'], df['buy_signal'], df['sell_signal'])):
-            price = row[1]
+        price = row[1]
         if row[2] == 1 and (bal.usd * bt.buy_pct_usd) > bt.min_usd:
             value_usd = bal.usd * bt.buy_pct_usd
             value_btc = value_usd / price
