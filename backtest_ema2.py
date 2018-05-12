@@ -32,8 +32,8 @@ class BacktestSettings:
     def set_factor_low(self, val):
         self.factor_low = val
     buy_amt_usd = 0
-    def set_buy_amt_usd(self, val):
-        self.buy_amt_usd = val
+    def set_buy_pct_usd(self, val):
+        self.buy_pct_usd = val
     sell_pct_btc = 0
     def set_sell_pct_btc(self, val):
         self.sell_pct_btc = val
@@ -56,9 +56,9 @@ def run_backtest(df, desired_outputs, bt):
     bal.set_usd(bt.principle_usd)
     fills = []
     for row in list(zip(df['time'], df['close'], df['buy_signal'], df['sell_signal'])):
-        if row[2] == 1 and (bal.usd * bt.sell_pct_usd) > bt.min_usd:
-            value_usd = bt.buy_bal * bt.sell_pct_usd
+        if row[2] == 1 and (bal.usd * bt.buy_pct_usd) > bt.min_usd:
             price = row[1]
+            value_usd = bal.usd * bt.buy_pct_usd
             value_btc = value_usd / price
             value_btc = value_btc - (value_btc * .001)
             bal.add_btc(value_btc)
@@ -126,7 +126,7 @@ def run_multi(df, my_result_type, bt, my_data):
     bt.set_factor_low(factor_low)
     bt.set_factor_high(factor_high)
     bt.set_sell_pct_btc(my_data[2])
-    bt.set_buy_amt_usd(my_data[3])
+    bt.set_buy_pct_usd(my_data[3])
     bt.set_lower_window(my_data[4])
     bt.set_upper_window(my_data[5])
     bt.set_min_usd(my_data[3])
