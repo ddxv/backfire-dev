@@ -56,15 +56,15 @@ def run_backtest(df, desired_outputs, bt):
     bal.set_usd(bt.principle_usd)
     fills = []
     for row in list(zip(df['time'], df['close'], df['buy_signal'], df['sell_signal'])):
-        if row[2] == 1 and bal.usd > bt.min_usd:
+        if row[2] == 1 and (bal.usd * bt.sell_pct_usd) > bt.min_usd:
+            value_usd = bt.buy_bal * bt.sell_pct_usd
             price = row[1]
-            value_usd = bt.buy_amt_usd
             value_btc = value_usd / price
             value_btc = value_btc - (value_btc * .001)
             bal.add_btc(value_btc)
             bal.sub_usd(value_usd)
             fills.append(create_fill(row[0], 'buy', price, value_btc, value_usd))
-        if row[3] == 1 and bal.btc > bt.min_btc:
+        if row[3] == 1 and (bal.btc * bt.sell_pct_btc) > bt.min_btc):
             price = row[1]
             value_btc = bal.btc * bt.sell_pct_btc
             value_usd = price * value_btc
@@ -73,7 +73,6 @@ def run_backtest(df, desired_outputs, bt):
             bal.sub_btc(value_btc)
             fills.append(create_fill(row[0], 'sell', price, value_btc, value_usd))
     num_fills = len(fills)
-    total_roi = (bal.usd - bt.principle_usd) / bt.principle_usd
     result = {
             "usd_bal": bal.usd, "btc_bal": bal.btc, "n_fills": num_fills,
             "upper_window": bt.upper_window, "lower_window": bt.lower_window,
@@ -134,8 +133,6 @@ def run_multi(df, my_result_type, bt, my_data):
     df = ema_logic.set_signals(df, bt)
     df = df[(df['sell_signal']==1) | (df['buy_signal'] == 1)]
     result = run_backtest(df, my_result_type, bt)
-    #result = {**pre_res_dict, **result}
-    #uplift = (total_roi - hodl_roi) / hodl_roi
     return(result)
 
 
