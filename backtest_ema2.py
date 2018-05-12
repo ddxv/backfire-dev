@@ -31,7 +31,7 @@ class BacktestSettings:
     factor_low = 0
     def set_factor_low(self, val):
         self.factor_low = val
-    buy_amt_usd = 0
+    buy_pct_usd = 0
     def set_buy_pct_usd(self, val):
         self.buy_pct_usd = val
     sell_pct_btc = 0
@@ -76,7 +76,7 @@ def run_backtest(df, desired_outputs, bt):
             "usd_bal": bal.usd, "btc_bal": bal.btc, "n_fills": num_fills,
             "upper_window": bt.upper_window, "lower_window": bt.lower_window,
             "upper_factor": bt.factor_high, "lower_factor": bt.factor_low,
-            "sell_pct_btc": bt.sell_pct_btc, "buy_amt_usd": bt.buy_amt_usd,
+            "sell_pct_btc": bt.sell_pct_btc, "buy_pct_usd": bt.buy_pct_usd,
             }
     if desired_outputs == "both":
         fills = pd.DataFrame(fills)

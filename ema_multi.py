@@ -28,7 +28,7 @@ def backtest_set(raw_data, start_date, end_date):
     my_result_type = 'backtest'
     start = time.time()
     rois = []
-    percent_iteratable = itertools.product(lower_factor_pcts, upper_factor_pcts, sell_pcts, sell_amts, lower_windows, upper_windows)
+    percent_iteratable = itertools.product(lower_factor_pcts, upper_factor_pcts, sell_pcts, buy_pcts, lower_windows, upper_windows)
     with Pool(8) as p:
         my_partial_func = partial(backtest_ema2.run_multi, df, my_result_type, bt_vars)
         result_list = p.map(my_partial_func, percent_iteratable)
@@ -36,10 +36,11 @@ def backtest_set(raw_data, start_date, end_date):
     end = time.time()
     print(datetime.now(), ((end - start) / 60), "minutes")
     rois_df = pd.concat([pd.DataFrame(d) for d in rois]).reset_index(drop = True)
-    rois_df = add_vectorized_cols(rois_df, bt_vars)
+    rois_df = add_vectorized_cols(df, rois_df, bt_vars)
     return(rois_df)
 
-def add_vectorized_cols(rois_df, bt_vars):
+
+def add_vectorized_cols(df, rois_df, bt_vars):
     rois_df['sd'] = start_date
     rois_df['ed'] = end_date
     final_close = df.tail(2)[0:1]['close'].values[0]
@@ -51,13 +52,12 @@ def add_vectorized_cols(rois_df, bt_vars):
     return(rois_df)
 
 
-
 raw_data = pd.read_csv('~/backfire/data/coinbase_fixed_2014-12-01_2018-05-06.csv')
 
 set_window = 150
-set_gap = 30
-start_date = '2017-11-01'
-sd = datetime.strptime(start_date, '%Y-%m-%d')
+set_gap = 15
+first_date = '2017-01-01'
+sd = datetime.strptime(first_date, '%Y-%m-%d')
 ed = sd + timedelta(days = set_window)
 end_date = ed.strftime('%Y-%m-%d')
 result_sets = []
@@ -65,15 +65,41 @@ while ed <= datetime.strptime('2018-05-05', '%Y-%m-%d'):
     start_date = sd.strftime('%Y-%m-%d')
     end_date = ed.strftime('%Y-%m-%d')
     rois = backtest_set(raw_data, start_date, end_date)
-    rois.to_csv(f'~/backfire/data/ema_{start_date}_{end_date}.csv', index = False)
+    rois.to_csv(f'~/backfire/data/greenriver/ema_{start_date}_{end_date}.csv', index = False)
     result_sets.append(rois)
     sd = sd + timedelta(days = set_gap)
     ed = ed + timedelta(days = set_gap)
-
 all_sets = pd.concat(result_sets)
-all_sets.to_csv(f'~/backfire/data/ema_all_t5m_sets_{start_date}_{end_date}.csv', index = False)
+all_sets.to_csv(f'~/backfire/data/greenriver/ema_all_{set_window}d_{set_gap}g_{first_date}.csv', index = False)
+
 
 # Drop top1k into GS
 top_1k_subset = all_sets.sort_values('roi', ascending = False).head(1000)
 tosheet.insert_df(top_1k_subset, sheet_name, 'top1k_year', 0)
+
+
+man_dates = [['2017-11-01',  '2018-04-06',],
+['2017-11-01',  '2018-05-06',],
+['2017-12-16',  '2018-02-05',],
+['2017-12-16',  '2018-05-06',],
+['2018-01-01',  '2018-05-06',],
+['2018-01-21',  '2018-05-06',],
+['2018-04-06',  '2018-05-06',],]
+
+
+
+for row in man_dates:
+    start_date = row[0]
+    end_date = row[1]
+    rois = backtest_set(raw_data, start_date, end_date)
+    rois.to_csv(f'~/backfire/data/man_tests/ema_man_tests_{start_date}_{end_date}.csv', index = False)
+    result_sets.append(rois)
+    top_1k_subset = all_sets.sort_values('roi', ascending = False).head(1000)
+    tosheet.insert_df(top_1k_subset, sheet_name, 'top1k_{start_date}_{end_date}', 0)
+all_sets = pd.concat(result_sets)
+all_sets.to_csv(f'~/backfire/data/man_tests/ema_all_man_tests.csv', index = False)
+
+
+
+
 
