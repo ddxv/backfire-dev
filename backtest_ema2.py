@@ -111,8 +111,7 @@ def single_backtest(df, bt):
     hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
     df = ema_logic.set_signals(df, bt)
     results, my_fills = run_backtest(df, 'both', bt)
-    if len(my_fills) > 0:
-        my_fills = fills_running_bal(my_fills, bt)
+    my_fills = fills_running_bal(my_fills, bt)
     results['hodl_roi'] = hodl_roi
     results['sd'] = df.time.min()
     results['ed'] = df.time.max()
@@ -136,20 +135,15 @@ def run_multi(df, my_result_type, bt, my_data):
 
 
 def fills_running_bal(fills_df, bt):
-    fills_df['p_usd'] = bt.principle_usd
-    fills_df['p_btc'] = bt.principle_btc
-    fills_df = cumsum_bal(fills_df, bt)
-    fills_df['running_bal'] = (fills_df['bal_btc'] * fills_df['price']) + fills_df['bal_usd']
-    return(fills_df)
-
-
-def cumsum_bal(fills_df, bt):
-    if sum(fills_df.side == 'sell') > 0:
+    if len(fills_df) > 0:
+        fills_df['p_usd'] = bt.principle_usd
+        fills_df['p_btc'] = bt.principle_btc
         fills_df['btc_val'] = np.where(fills_df['side'] == 'sell', fills_df['btc_val'] * -1, fills_df['btc_val'])
-    if sum(fills_df.side == 'buy') > 0:
         fills_df['usd_val'] = np.where(fills_df['side'] == 'buy', fills_df['usd_val'] * -1, fills_df['usd_val'])
-    fills_df['bal_btc'] = fills_df.btc_val.cumsum() + bt.principle_btc
-    fills_df['bal_usd'] = fills_df.usd_val.cumsum() + bt.principle_usd
+        fills_df['bal_btc'] = fills_df.btc_val.cumsum() + bt.principle_btc
+        fills_df['bal_usd'] = fills_df.usd_val.cumsum() + bt.principle_usd
+        fills_df['running_bal'] = (fills_df['bal_btc'] * fills_df['price']) + fills_df['bal_usd']
+    else:
+        print("WARNING: Fills DataFrame is empty")
     return(fills_df)
-
 
