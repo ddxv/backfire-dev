@@ -54,9 +54,10 @@ def add_vectorized_cols(df, rois_df, bt_vars):
 
 raw_data = pd.read_csv('~/backfire/data/coinbase_fixed_2014-12-01_2018-05-06.csv')
 
-set_window = 150
-set_gap = 15
-first_date = '2017-01-01'
+test_name = 'monthbymonth'
+set_window = 30
+set_gap = 30
+first_date = '2017-03-29'
 sd = datetime.strptime(first_date, '%Y-%m-%d')
 ed = sd + timedelta(days = set_window)
 end_date = ed.strftime('%Y-%m-%d')
@@ -64,13 +65,14 @@ result_sets = []
 while ed <= datetime.strptime('2018-05-05', '%Y-%m-%d'):
     start_date = sd.strftime('%Y-%m-%d')
     end_date = ed.strftime('%Y-%m-%d')
+    print(sd, ed)
     rois = backtest_set(raw_data, start_date, end_date)
-    rois.to_csv(f'~/backfire/data/greenriver/ema_{start_date}_{end_date}.csv', index = False)
+    rois.to_csv(f'~/backfire/data/{test_name}/ema_{start_date}_{end_date}.csv', index = False)
     result_sets.append(rois)
-    sd = sd + timedelta(days = set_gap)
-    ed = ed + timedelta(days = set_gap)
+    sd = sd + timedelta(days = set_gap + 1)
+    ed = sd + timedelta(days = set_window)
 all_sets = pd.concat(result_sets)
-all_sets.to_csv(f'~/backfire/data/greenriver/ema_all_{set_window}d_{set_gap}g_{first_date}.csv', index = False)
+all_sets.to_csv(f'~/backfire/data/{test_name}/ema_all_{set_window}d_{set_gap}g_{first_date}.csv', index = False)
 
 
 # Drop top1k into GS
@@ -87,17 +89,25 @@ man_dates = [['2017-11-01',  '2018-04-06',],
 ['2018-04-06',  '2018-05-06',],]
 
 
-
 for row in man_dates:
     start_date = row[0]
     end_date = row[1]
     rois = backtest_set(raw_data, start_date, end_date)
     rois.to_csv(f'~/backfire/data/man_tests/ema_man_tests_{start_date}_{end_date}.csv', index = False)
     result_sets.append(rois)
-    top_1k_subset = all_sets.sort_values('roi', ascending = False).head(1000)
-    tosheet.insert_df(top_1k_subset, sheet_name, 'top1k_{start_date}_{end_date}', 0)
+    top_1k_subset = rois.sort_values('roi', ascending = False).head(1000)
+    tosheet.insert_df(top_1k_subset, sheet_name, f'top1k_{start_date}_{end_date}', 0)
 all_sets = pd.concat(result_sets)
-all_sets.to_csv(f'~/backfire/data/man_tests/ema_all_man_tests.csv', index = False)
+all_sets.to_csv(f'~/backfire/data/man_tests/ema_all_man_testsw.csv', index = False)
+
+
+pd.read_csv('~/backfire/data/man_tests/ema_all_man_testsw.csv')
+
+
+
+# Drop top1k into GS
+top_1k_subset = all_sets.sort_values('roi', ascending = False).head(1000)
+tosheet.insert_df(top_1k_subset, sheet_name, 'top1k_year', 0)
 
 
 
