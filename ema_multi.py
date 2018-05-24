@@ -1,25 +1,32 @@
 from datetime import datetime, timedelta
 from multiprocessing import Pool
 from functools import partial
-from sheety import tosheet
 import backtest_ema2
 import pandas as pd
 import itertools
 import time
 
-sheet_name = 'BacktestResults'
 
 def backtest_set(raw_data, start_date, end_date):
     day_df, df = backtest_ema2.prep_data(raw_data, start_date, end_date)
     df = df[['close', 'time']]
     
+    principle = 500
+    principle_split = principle / 2
+    principle_usd = principle_split
+    principle_btc = principle_split / df[0:1]['close'].values[0]
+    
     bt_vars = backtest_ema2.BacktestSettings()
     bt_vars.set_min_btc(.001)
     bt_vars.set_min_usd(100)
-    bt_vars.set_principle_usd(25000)
+    bt_vars.set_principle_usd(principle_usd)
+    bt_vars.set_principle_btc(principle_btc)
     
-    sell_pcts = [(2 ** x) / 1000 for x in range(3, 10)]
-    buy_pcts = [(2 ** x) / 1000 for x in range(3, 10)]
+    sell_pcts = [(2 ** x) / 1000 for x in range(4, 11)]
+    sell_pcts = [1 if x > 1 else x for x in sell_pcts]
+    buy_pcts = [(2 ** x) / 1000 for x in range(4, 11)]
+    buy_pcts = [1 if x > 1 else x for x in buy_pcts]
+
     upper_windows = [(2 ** x) for x in range(4, 13)]
     lower_windows = [(2 ** x) for x in range(4, 13)]
     lower_factor_pcts = [(2 ** x) / 10000 for x in range(5, 10)]
@@ -36,11 +43,11 @@ def backtest_set(raw_data, start_date, end_date):
     end = time.time()
     print(datetime.now(), ((end - start) / 60), "minutes")
     rois_df = pd.concat([pd.DataFrame(d) for d in rois]).reset_index(drop = True)
-    rois_df = add_vectorized_cols(df, rois_df, bt_vars)
+    rois_df = add_vectorized_cols(df, rois_df, bt_vars, start_date, end_date)
     return(rois_df)
 
 
-def add_vectorized_cols(df, rois_df, bt_vars):
+def add_vectorized_cols(df, rois_df, bt_vars, start_date, end_date):
     rois_df['sd'] = start_date
     rois_df['ed'] = end_date
     final_close = df.tail(2)[0:1]['close'].values[0]
@@ -54,62 +61,27 @@ def add_vectorized_cols(df, rois_df, bt_vars):
 
 raw_data = pd.read_csv('~/backfire/data/coinbase_fixed_2014-12-01_2018-05-06.csv')
 
-test_name = 'monthbymonth'
-set_window = 30
-set_gap = 30
-first_date = '2017-03-29'
+test_name = 'stairstepsfive_gdax'
+first_date = '2017-12-01'
+set_window = 90
+set_step = 5
 sd = datetime.strptime(first_date, '%Y-%m-%d')
 ed = sd + timedelta(days = set_window)
 end_date = ed.strftime('%Y-%m-%d')
 result_sets = []
-while ed <= datetime.strptime('2018-05-05', '%Y-%m-%d'):
+while ed <= datetime.strptime('2018-04-05', '%Y-%m-%d'):
     start_date = sd.strftime('%Y-%m-%d')
     end_date = ed.strftime('%Y-%m-%d')
     print(sd, ed)
     rois = backtest_set(raw_data, start_date, end_date)
-    rois.to_csv(f'~/backfire/data/{test_name}/ema_{start_date}_{end_date}.csv', index = False)
+    #rois.to_csv(f'~/backfire/data/{test_name}/ema_{start_date}_{end_date}.csv', index = False)
     result_sets.append(rois)
-    sd = sd + timedelta(days = set_gap + 1)
+    sd = sd + timedelta(days = set_step + 1)
     ed = sd + timedelta(days = set_window)
 all_sets = pd.concat(result_sets)
-all_sets.to_csv(f'~/backfire/data/{test_name}/ema_all_{set_window}d_{set_gap}g_{first_date}.csv', index = False)
 
-
-# Drop top1k into GS
-top_1k_subset = all_sets.sort_values('roi', ascending = False).head(1000)
-tosheet.insert_df(top_1k_subset, sheet_name, 'top1k_year', 0)
-
-
-man_dates = [['2017-11-01',  '2018-04-06',],
-['2017-11-01',  '2018-05-06',],
-['2017-12-16',  '2018-02-05',],
-['2017-12-16',  '2018-05-06',],
-['2018-01-01',  '2018-05-06',],
-['2018-01-21',  '2018-05-06',],
-['2018-04-06',  '2018-05-06',],]
-
-
-for row in man_dates:
-    start_date = row[0]
-    end_date = row[1]
-    rois = backtest_set(raw_data, start_date, end_date)
-    rois.to_csv(f'~/backfire/data/man_tests/ema_man_tests_{start_date}_{end_date}.csv', index = False)
-    result_sets.append(rois)
-    top_1k_subset = rois.sort_values('roi', ascending = False).head(1000)
-    tosheet.insert_df(top_1k_subset, sheet_name, f'top1k_{start_date}_{end_date}', 0)
-all_sets = pd.concat(result_sets)
-all_sets.to_csv(f'~/backfire/data/man_tests/ema_all_man_testsw.csv', index = False)
-
-
-pd.read_csv('~/backfire/data/man_tests/ema_all_man_testsw.csv')
-
-
-
-# Drop top1k into GS
-top_1k_subset = all_sets.sort_values('roi', ascending = False).head(1000)
-tosheet.insert_df(top_1k_subset, sheet_name, 'top1k_year', 0)
-
-
-
+folder_name = f'~/backfire/data/{test_name}/ema_all_{set_window}w_{set_step}s_{first_date}.csv'
+print(folder_name)
+all_sets.to_csv(folder_name, index = False)
 
 
