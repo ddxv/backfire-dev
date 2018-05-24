@@ -1,14 +1,14 @@
 from datetime import datetime, timedelta
 from multiprocessing import Pool
 from functools import partial
-import backtest_ema2
+from backfire import ema
 import pandas as pd
 import itertools
 import time
 
 
 def backtest_set(raw_data, start_date, end_date):
-    day_df, df = backtest_ema2.prep_data(raw_data, start_date, end_date)
+    day_df, df = ema.prep_data(raw_data, start_date, end_date)
     df = df[['close', 'time']]
     
     principle = 500
@@ -16,7 +16,7 @@ def backtest_set(raw_data, start_date, end_date):
     principle_usd = principle_split
     principle_btc = principle_split / df[0:1]['close'].values[0]
     
-    bt_vars = backtest_ema2.BacktestSettings()
+    bt_vars = ema.BacktestSettings()
     bt_vars.set_min_btc(.001)
     bt_vars.set_min_usd(100)
     bt_vars.set_principle_usd(principle_usd)
@@ -37,7 +37,7 @@ def backtest_set(raw_data, start_date, end_date):
     rois = []
     percent_iteratable = itertools.product(lower_factor_pcts, upper_factor_pcts, sell_pcts, buy_pcts, lower_windows, upper_windows)
     with Pool(8) as p:
-        my_partial_func = partial(backtest_ema2.run_multi, df, my_result_type, bt_vars)
+        my_partial_func = partial(ema.run_multi, df, my_result_type, bt_vars)
         result_list = p.map(my_partial_func, percent_iteratable)
         rois.append(result_list)
     end = time.time()

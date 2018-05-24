@@ -7,9 +7,8 @@ install_requires = [
 setup(
         name = 'backfire',
         version = '0.1',
-        scripts = ['backtest.py', 'backtest_turtle.py', 'ema_logic.py'],
         author = 'James',
-        packages = find_packages(),
+        packages = ['']
         install_requires = install_requires,
         py_modules = ['backfire'],
 )
