@@ -8,7 +8,7 @@ setup(
         name = 'backfire',
         version = '0.1',
         author = 'James',
-        packages = ['']
+        packages = [''],
         install_requires = install_requires,
         py_modules = ['backfire'],
 )
