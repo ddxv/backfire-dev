@@ -18,7 +18,7 @@ class AccountBalances:
     def set_btc(self, new_bal):
         self.btc = new_bal
 
-class BacktestSettings:
+class AlgSettings:
     upper_window = 0
     def set_upper_window(self, val):
         self.upper_window = val

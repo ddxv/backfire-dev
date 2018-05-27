@@ -5,6 +5,7 @@ import pandas as pd
 import mysql_prices as ms
 from time import sleep
 import logging
+from backfire.backtest.ema import AccountBalances
 FORMAT = '%(asctime)s: %(name)s:  %(levelname)s:  %(message)s'
 logging.basicConfig(format = FORMAT, filename = 'trade.log', level = logging.INFO)
 formatter = logging.Formatter(FORMAT)
@@ -180,12 +181,6 @@ def dip_check_loop(bw, sw, pb, ps, x, p, cur_tick):
 
 
 
-##Bids must be submitted as strings with nomore than two decimal points
-#def strf_bid(bid):
-#    bid = "%.2f" % bid
-#    bid = str(bid)
-#    return(bid)
-
 # TODO deal with rounding issues!
 def strf_float(var, digits):
     var = f'%.{digits}f' % var
@@ -249,7 +244,6 @@ def check_fills():
     return(my_fills)
 
 
-
 #Check to see when buy order is successful, timelimit based on GTT
 def fill_loop(order, cur_tick):
     exp = datetime.strptime(order['expire_time'], "%Y-%m-%dT%H:%M:%S.%f")
@@ -269,31 +263,9 @@ def fill_loop(order, cur_tick):
 
 
 
-def update_order_db(order, fill):
-   fill['principal'] = float(fill['fee']) + (float(fill['price']) * float(fill['size']))
-   fill['breakeven'] = fill['principal'] / float(fill['size'])
-   fill['sell_bid'] = order['sell_bid']
-   fill = pd.DataFrame([fill])
-   if not joker:
-       con = ms.connect_mysql()
-       fill.to_sql('buy_btc_orders',con, if_exists="append", index=False)
-
-
-
-def update_sell_db(order, fill):
-    all=pd.DataFrame(ac.get_orders()[0])
-    all.created_at = pd.to_datetime(all.created_at)
-    cutoff = datetime.now() - timedelta(hours=1)
-    stale_sells = all.loc[(all['side']=='sell') & (all['created_at'] < cutoff)].id
-    for id in stale_sells:
-        logger.info("stale sell orders: " + str(stale_sells.values.tolist()))
-
-
-
-
-
 def append_fills_table(fills_df, table_name):
     fills_df['created_at'] = pd.to_datetime(fills_df['created_at'])
+    engine = ms.connect_mysql()
     trade_ids = pd.read_sql(sql = f'SELECT trade_id from {table_name}', con = engine)
     trade_ids = trade_ids['trade_id'].tolist()
     new_rows = fills_df[~fills_df['trade_id'].isin(trade_ids)]
@@ -310,25 +282,43 @@ def get_gdax_fills(ac):
     return(fills_df)
 
 
-engine = ms.connect_mysql()
+def get_gdax_orders(ac):
+    gdax_orders = ac.get_orders()
+    flat_list = [item for sublist in gdax_orders for item in sublist]
+    orders_df = pd.DataFrame(flat_list)
+    orders_df = orders_df.rename(columns = {'id': 'order_id', 'product_id': 'symbol_pair', 'size': 'amt', 'type': 'order_type', 'filled_size': 'filled_amt'})
+    return(orders_df)
+
+def append_orders_table(orders_df, table_name):
+    orders_df['created_at'] = pd.to_datetime(orders_df['created_at'])
+    engine = ms.connect_mysql()
+    order_ids = pd.read_sql(sql = f'SELECT order_id from {table_name}', con = engine)
+    order_ids = order_ids['order_id'].tolist()
+    new_rows = orders_df[~orders_df['order_id'].isin(order_ids)]
+    if len(new_rows) > 0:
+        new_rows.to_sql(name = table_name,
+                con = engine,
+                if_exists = 'append', index = False)
+
+
+
+signal_id = 'manual'
+alg_id = 'manual'
+
+# Fills
 table_name = 'gdax_fills'
-
 fills_df = get_gdax_fills(ac)
-
 fills_df['signal_id'] = signal_id
 fills_df['alg_id'] = alg_id
-
 append_fills_table(fills_df, 'gdax_fills')
 
-engine = ms.connect_mysql()
+
+# Orders
+# Is this only ever open orders, what if order closes, is this == to order response?
 table_name = 'gdax_orders'
-
-
-
-    gdax_fills = ac.get_fills()
-    flat_list = [item for sublist in gdax_fills for item in sublist]
-    fills_df = pd.DataFrame(flat_list)
-    fills_df = fills_df.rename(columns = {'product_id': 'symbol_pair', 'size': 'amt', 'usd_volume': 'amt_usd'})
-    return(fills_df)
+orders_df = get_gdax_orders(ac)
+orders_df['signal_id'] = signal_id
+orders_df['alg_id'] = alg_id
+append_orders_table(orders_df, 'gdax_orders')
 
 
