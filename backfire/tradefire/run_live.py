@@ -1,11 +1,10 @@
-
-
+from backfire.backtest.ema import AccountBalances, AlgSettings
 
 
 
 #LIVE ACCOUNT
-ac = initialize_gdax(False)
-mult = 1
+#ac = initialize_gdax(False)
+#mult = 1
 
 
 #SANDBOX
@@ -15,70 +14,30 @@ mult = 2
 
 pc = gdax.PublicClient()
 
-#Initialize Account Values
-usdMin = 90
 
-keep_usd_in_account = 2
+# Human readable Accounts DF
+account_df = pd.DataFrame(ac.get_accounts())
 
-btcAcc = None
-usdAcc = None
-btcVal = None
-usdVal = None
-btcHold = None
-usdHold = None
-#All Buy/Sells
-#Sandbox
-joker = True
-
-
-
-eng = ms.connect_mysql()
-result = eng.execute("select max(mean) from btc_price_usd_minute")
-for r in result:
-    recent_max = r[0]
-result.close()
-my_max = float(recent_max) * .995
-my_max
-
-
-#Human readable Accounts DF
-accDF = pd.DataFrame(ac.get_accounts())
-
-##Get previously set orders, decide, may be long orders
+# Get previously set orders, decide, may be long orders
 open_orders = get_open_orders()
 
-long_orders=[]
-long_orders = open_orders['oldIds'] + open_orders['youngIds']
 
+alg_vars = AlgSettings()
 
+#Initialize Account Values
 
-##Just Kill all old orders?
-#stale_orders = get_open_orders()['oldIds']
-#kill_orders(stale_orders)
-
-
-
-#Drop Old Fills & Orders and Remake Tables
-#ms.drop_table('test_fills')
-ms.drop_table('test_orders')
-
-
-orders = pd.DataFrame(ac.get_orders()[0])
-if len(orders>0):
-    con = ms.connect_mysql()
-    orders.to_sql('test_orders',con, if_exists="replace", index=False)
-
-
-#Check & Replace Fills table
-fills = check_fills()
-
-
-cur = 'BTC'
-bw = 25
-sw = 3
-x = .0015
-pb = .001666
-ps = .000505
+alg_vars.set_principle_usd(40)
+alg_vars.set_principle_btc(.04)
+alg_vars.set_upper_window(64)
+alg_vars.set_lower_window(64)
+upper_factor = 1.0128
+lower_factor = 0.9744
+alg_vars.set_factor_high(upper_factor)
+alg_vars.set_factor_low(lower_factor)
+alg_vars.set_buy_pct_usd(0.5)
+alg_vars.set_sell_pct_btc(0.12)
+alg_vars.set_min_usd(100)
+alg_vars.set_min_btc(.001)
 
 #Start Looping Buy orders & Sell Orders
 while True:
@@ -97,10 +56,4 @@ while True:
             result = fill_loop(new_order, cur)
     fills = check_fills()
     sleep(180)
-    eng = ms.connect_mysql()
-    result = eng.execute("select max(mean) from btc_price_usd_minute")
-    for r in result:
-        recent_max = r[0]
-    result.close()
-    my_max = float(recent_max) * .995
 

@@ -1,3 +1,4 @@
+import numpy as np
 import gdax
 import json
 from datetime import datetime, timedelta
@@ -5,7 +6,7 @@ import pandas as pd
 import mysql_prices as ms
 from time import sleep
 import logging
-from backfire.backtest.ema import AccountBalances
+import backfire.tradefire.bot_db
 FORMAT = '%(asctime)s: %(name)s:  %(levelname)s:  %(message)s'
 logging.basicConfig(format = FORMAT, filename = 'trade.log', level = logging.INFO)
 formatter = logging.Formatter(FORMAT)
@@ -16,61 +17,6 @@ if not len(logger.handlers):
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-
-class AccountBalances:
-    usd = 0
-    usd_hold = 0
-    btc = 0
-    btc_hold = 0
-    def sub_btc(self, btc_amt):
-        self.btc -= btc_amt
-    def sub_usd(self, usd_amt):
-        self.usd -= usd_amt
-    def add_btc(self, btc_amt):
-        self.btc += btc_amt
-    def add_usd(self, usd_amt):
-        self.usd += usd_amt
-    def set_usd(self, new_bal):
-        self.usd = new_bal
-    def set_btc(self, new_bal):
-        self.btc = new_bal
-    def set_usd_hold(self, new_bal):
-        self.usd_hold = new_bal
-    def set_btc_hold(self, new_bal):
-        self.btc_hold = new_bal
-
-class AlgoSettings:
-    upper_window = 0
-    def set_upper_window(self, val):
-        self.upper_window = val
-    lower_window = 0
-    def set_lower_window(self, val):
-        self.lower_window = val
-    factor_high = 0
-    def set_factor_high(self, val):
-        self.factor_high = val
-    factor_low = 0
-    def set_factor_low(self, val):
-        self.factor_low = val
-    buy_pct_usd = 0
-    def set_buy_pct_usd(self, val):
-        self.buy_pct_usd = val
-    sell_pct_btc = 0
-    def set_sell_pct_btc(self, val):
-        self.sell_pct_btc = val
-    principle_btc = 0
-    def set_principle_btc(self, val):
-        self.principle_btc = val
-    principle_usd = 0
-    def set_principle_usd(self, val):
-        self.principle_usd = val
-    min_usd = 0
-    def set_min_usd(self, val):
-        self.min_usd = val
-    min_btc = 0
-    def set_min_btc(self, val):
-        self.min_btc = val
-
 
 def initialize_gdax(test_bool):
     gdax_auth = json.load(open('/home/bitnami/auth/gdax'))
@@ -97,24 +43,6 @@ def initialize_account_info(acc):
     usd_acc_id = my_find(my_accounts, 'currency', 'USD')['profile_id']
     #??
 
-#Global variables for available account balances
-def update_account_info(acc):
-    my_accounts = gdax_client.get_accounts()
-    while type(my_accounts) is not list:
-        logger.warning("Retrying get_accounts")
-        sleep(1)
-        my_accounts = ac.get_accounts()
-    acc.set_btc(float(my_find(my_accounts, 'currency', 'BTC')['available']))
-    acc.set_usd(float(my_find(my_accounts, 'currency', 'USD')['available']))
-    acc.set_btc_hold(float(my_find(my_accounts, 'currency', 'BTC')['hold']))
-    acc.set_usd_hold(float(my_find(my_accounts, 'currency', 'USD')['hold']))
-    return(acc)
-
-#def replace_fills(fills):
-#    if not joker:
-#        con = ms.connect_mysql()
-#        fills.to_sql('test_fills',con, if_exists="replace", index=False)
-
 #Simply returns open orders
 def get_open_orders():
     my_orders = ac.get_orders()
@@ -133,11 +61,6 @@ def get_open_orders():
     return(id_dict)
 
 
-##List of Order IDs to kill
-#def kill_orders(ids):
-#   for i in ids:
-#       if i not in long_orders:
-#           ac.cancel_order(i)
 
 #Main Buy Logic, when the mean of last 5 minutes of 3m SMA is > .3% different from 30m SMA (rolling mean not centered)
 #Output can be 'p' for calculation or 'df' for full dataframe.tail
@@ -156,8 +79,6 @@ def check_rolling_movement(bw, sw, output):
         return p
     if output == 'df':
         return df
-
-
 
 
 
@@ -262,63 +183,18 @@ def fill_loop(order, cur_tick):
             sleep(2)
 
 
-
-def append_fills_table(fills_df, table_name):
-    fills_df['created_at'] = pd.to_datetime(fills_df['created_at'])
-    engine = ms.connect_mysql()
-    trade_ids = pd.read_sql(sql = f'SELECT trade_id from {table_name}', con = engine)
-    trade_ids = trade_ids['trade_id'].tolist()
-    new_rows = fills_df[~fills_df['trade_id'].isin(trade_ids)]
-    if len(new_rows) > 0:
-        new_rows.to_sql(name = table_name,
-                con = engine,
-                if_exists = 'append', index = False)
-
-def get_gdax_fills(ac):
-    gdax_fills = ac.get_fills()
-    flat_list = [item for sublist in gdax_fills for item in sublist]
-    fills_df = pd.DataFrame(flat_list)
-    fills_df = fills_df.rename(columns = {'product_id': 'symbol_pair', 'size': 'amt', 'usd_volume': 'amt_usd'})
-    return(fills_df)
-
-
-def get_gdax_orders(ac):
-    gdax_orders = ac.get_orders()
-    flat_list = [item for sublist in gdax_orders for item in sublist]
-    orders_df = pd.DataFrame(flat_list)
-    orders_df = orders_df.rename(columns = {'id': 'order_id', 'product_id': 'symbol_pair', 'size': 'amt', 'type': 'order_type', 'filled_size': 'filled_amt'})
-    return(orders_df)
-
-def append_orders_table(orders_df, table_name):
-    orders_df['created_at'] = pd.to_datetime(orders_df['created_at'])
-    engine = ms.connect_mysql()
-    order_ids = pd.read_sql(sql = f'SELECT order_id from {table_name}', con = engine)
-    order_ids = order_ids['order_id'].tolist()
-    new_rows = orders_df[~orders_df['order_id'].isin(order_ids)]
-    if len(new_rows) > 0:
-        new_rows.to_sql(name = table_name,
-                con = engine,
-                if_exists = 'append', index = False)
-
-
+ac = initialize_gdax(False)
 
 signal_id = 'manual'
-alg_id = 'manual'
+bot_id = 'manual'
 
-# Fills
-table_name = 'gdax_fills'
+
+
+
+#order_aff = pd.read_sql(sql = f'SELECT * from gdax_order_bot_aff where order_id in ({stale_str})', con = engine)
 fills_df = get_gdax_fills(ac)
-fills_df['signal_id'] = signal_id
-fills_df['alg_id'] = alg_id
-append_fills_table(fills_df, 'gdax_fills')
-
-
-# Orders
-# Is this only ever open orders, what if order closes, is this == to order response?
-table_name = 'gdax_orders'
-orders_df = get_gdax_orders(ac)
-orders_df['signal_id'] = signal_id
-orders_df['alg_id'] = alg_id
-append_orders_table(orders_df, 'gdax_orders')
-
+append_if_new('trade_id', fills_df, 'gdax_fill_hist')
+prep_gdax_order_hist(stale_hist)
+append_if_new('order_id', stale_hist, 'gdax_order_hist')
+append_if_new('order_id', orders_df, 'gdax_orders_cur')
 
