@@ -7,6 +7,10 @@ import mysql_prices as ms
 from time import sleep
 import logging
 import backfire.tradefire.bot_db
+from backfire.settings import EmaSettings
+# Not in git
+import ema_logic
+
 FORMAT = '%(asctime)s: %(name)s:  %(levelname)s:  %(message)s'
 logging.basicConfig(format = FORMAT, filename = 'trade.log', level = logging.INFO)
 formatter = logging.Formatter(FORMAT)
@@ -17,6 +21,8 @@ if not len(logger.handlers):
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+
+
 
 def initialize_gdax(test_bool):
     gdax_auth = json.load(open('/home/bitnami/auth/gdax'))
@@ -38,35 +44,35 @@ def my_find(lst, key, value):
         if dic[key] == value:
             return dic
 
-def initialize_account_info(acc):
-    btc_acc_id = my_find(my_accounts, 'currency', 'BTC')['profile_id']
-    usd_acc_id = my_find(my_accounts, 'currency', 'USD')['profile_id']
-    #??
-
-#Simply returns open orders
-def get_open_orders():
-    my_orders = ac.get_orders()
-    while type(my_orders) is not list:
-        sleep(2)
-        my_orders = ac.get_orders()
-    if len(my_orders[0]) == 0:
-        young_ids = []
-        old_ids = []
-    else:
-        order_df = pd.DataFrame(my_orders[0])
-        open_orders = order_df[order_df['status'] == 'open']
-        old_ids = open_orders[pd.to_datetime(open_orders['created_at']) < datetime.now() - timedelta(minutes=20)]['id'].tolist()
-        young_ids = open_orders[pd.to_datetime(openOrders['created_at']) >= datetime.now() - timedelta(minutes=20)]['id'].tolist()
-    id_dict = {"young_ids": young_ids, "old_ids": old_ids}
+##Simply returns open orders
+#def get_open_orders():
+#    my_orders = ac.get_orders()
+#    while type(my_orders) is not list:
+#        sleep(2)
+#        my_orders = ac.get_orders()
+#    if len(my_orders[0]) == 0:
+#        young_ids = []
+#        old_ids = []
+#    else:
+#        order_df = pd.DataFrame(my_orders[0])
+#        open_orders = order_df[order_df['status'] == 'open']
+#        old_ids = open_orders[pd.to_datetime(open_orders['created_at']) < datetime.now() - timedelta(minutes=20)]['id'].tolist()
+#        young_ids = open_orders[pd.to_datetime(openOrders['created_at']) >= datetime.now() - timedelta(minutes=20)]['id'].tolist()
+#    id_dict = {"young_ids": young_ids, "old_ids": old_ids}
     return(id_dict)
 
 
 
 #Main Buy Logic, when the mean of last 5 minutes of 3m SMA is > .3% different from 30m SMA (rolling mean not centered)
 #Output can be 'p' for calculation or 'df' for full dataframe.tail
-def check_rolling_movement(bw, sw, output):
+def check_indicator_movement(bw, sw, output):
+    
+    window_max = max(lower_window, upper_window)
+
+
     start_time = datetime.now().replace(microsecond = 0) - timedelta(hours = 1)
     df = ms.get_btc_prices_usd_minute(start_time)
+
     df['bw'] = df.rolling(window = bw, min_periods = bw)['mean'].mean()
     df['sw'] = df.rolling(window = sw, min_periods = sw)['mean'].mean()
     #Note that this df.tail() returns most recent 5 minutes of data only
@@ -83,9 +89,9 @@ def check_rolling_movement(bw, sw, output):
 
 
 #Holding pattern to check for changes in p
-def dip_check_loop(bw, sw, pb, ps, x, p, cur_tick):
+def indicator_loop(bw, sw, pb, ps, x, p, cur_tick):
     while p > -(x / mult):
-        p = check_rolling_movement(bw, sw, 'check')
+        p = indicator_movement(bw, sw, 'check')
         #Magic number, potential profit, should be larger than fees?
         if abs(p) >= (x / mult):
             update_account_info()
