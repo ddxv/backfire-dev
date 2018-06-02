@@ -27,10 +27,10 @@ class BacktestSettings:
         self.lower_window = val
     factor_high = 0
     def set_factor_high(self, val):
-        self.factor_high = 1.0 + val
+        self.factor_high = val
     factor_low = 0
     def set_factor_low(self, val):
-        self.factor_low = 1.0 - val
+        self.factor_low = val
     buy_pct_usd = 0
     def set_buy_pct_usd(self, val):
         self.buy_pct_usd = val
@@ -127,8 +127,8 @@ def single_backtest(df, bt):
 def run_multi(df, my_result_type, bt, my_data):
     bt.set_upper_window(my_data[0])
     bt.set_lower_window(my_data[1])
-    bt.set_factor_high(1 + my_data[2])
-    bt.set_factor_low(1 - my_data[3])
+    bt.set_factor_high(my_data[2])
+    bt.set_factor_low(my_data[3])
     bt.set_buy_pct_usd(my_data[4])
     bt.set_sell_pct_btc(my_data[5])
     
