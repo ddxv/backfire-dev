@@ -22,16 +22,27 @@ def backtest_set(raw_data, start_date, end_date):
     bt_vars.set_principle_usd(principle_usd)
     bt_vars.set_principle_btc(principle_btc)
     
-    sell_pcts = [(2 ** x) / 1000 for x in range(4, 11)]
-    sell_pcts = [1 if x > 1 else x for x in sell_pcts]
-    buy_pcts = [(2 ** x) / 1000 for x in range(4, 11)]
-    buy_pcts = [1 if x > 1 else x for x in buy_pcts]
+    pcts = [(2 ** x) / 1000 for x in range(4, 11)]
+    pcts = [1 if x > 1 else x for x in pcts]
+    sell_pcts = pcts
+    buy_pcts = pcts
 
-    upper_windows = [(2 ** x) for x in range(4, 13)]
-    lower_windows = [(2 ** x) for x in range(4, 13)]
-    lower_factor_pcts = [(2 ** x) / 10000 for x in range(5, 10)]
-    upper_factor_pcts = [(2 ** x) / 10000 for x in range(5, 10)]
+    windows = [(2 ** x) for x in range(4, 13)]
+    upper_windows = windows
+    lower_windows = windows
+
+    factor_pcts = [(2 ** x) / 10000 for x in range(5, 10)]
+    lower_factor_pcts = factor_pcts
+    upper_factor_pcts = factor_pcts
     
+    # fix the start time for ema to unfold
+    ema_length = int(pd.DataFrame(windows).max()) #find the biggest window size
+    start_time_fixed = ema.get_start_time_for_ema(ema_length, start_date)
+
+    # prep data
+    day_df, df = ema.prep_data(raw_data, start_time_fixed, end_date)
+    df = df[['close', 'timestamp']]
+
     my_result_type = 'backtest'
     start = time.time()
     rois = []

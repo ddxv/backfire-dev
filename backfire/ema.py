@@ -1,6 +1,8 @@
 import pandas as pd
 import ema_logic
 import numpy as np
+from datetime import datetime
+from datetime import timedelta
 
 class AccountBalances:
     usd = 0
@@ -49,6 +51,12 @@ class BacktestSettings:
     min_btc = 0
     def set_min_btc(self, val):
         self.min_btc = val
+    start_date = 0
+    def set_start_date(self, val):
+        self.start_date = val
+    end_date = 0
+    def set_end_date(self, val):
+        self.end_date = val
 
 
 def run_backtest(df, desired_outputs, bt):
@@ -99,6 +107,21 @@ def create_fill(my_time, my_side, btc_price, btc_val, usd_val):
     result['usd_val'] = usd_val
     return(result)
 
+# returns a time in the past with correct offset so the ema line can calculate correctly before our
+# actual backtestin start date.
+# the formula is: start_time - (base_length * ema_period_lenght) as minutes
+# we should probably do a check here somewhere in the future to prevent times in the past which
+# are beyond our available data set.
+def get_start_time_for_ema(ema_length, start_time):
+	# base multiplier for our ema length
+	base_length = 100 
+	
+	# start date is offset into the past by the ema length * base length
+	new_start = datetime.strptime(start_time, "%Y-%m-%d") - pd.DateOffset(minutes=(ema_length * base_length))
+
+	# return the new date as a str
+	return str(new_start)
+
 
 def prep_data(raw_data, start_time, end_time):
     #raw_data = pd.read_csv('~/coinbase_data.csv')
@@ -114,12 +137,15 @@ def single_backtest(df, bt):
     final_close = df.tail(2)[0:1]['close'].values[0]
     hodl_usd = (bt.principle_usd / df[0:1]['close'].values[0]) * final_close
     hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
+
     df = ema_logic.set_signals(df, bt)
+    # trim results and ignore fills below on our start date:
+    df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)] 
     results, my_fills = run_backtest(df, 'both', bt)
     my_fills = fills_running_bal(my_fills, bt)
     results['hodl_roi'] = hodl_roi
-    results['sd'] = df.timestamp.min()
-    results['ed'] = df.timestamp.max()
+    results['sd'] = bt.start_date# df.timestamp.min()
+    results['ed'] = bt.end_date # df.timestamp.max()
     results['final_bal'] = results['usd_bal'] + (final_close * results['btc_bal'])
     results['roi'] = (results['final_bal'] - bt.principle_usd) / bt.principle_usd
     return(df, results, my_fills)
@@ -133,6 +159,8 @@ def run_multi(df, my_result_type, bt, my_data):
     bt.set_sell_pct_btc(my_data[5])
     
     df = ema_logic.set_signals(df, bt)
+    # trim results and ignore fills below on our start date:
+    df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)] 
     df = df[(df['sell_signal']==1) | (df['buy_signal'] == 1)]
     result = run_backtest(df, my_result_type, bt)
     return(result)
