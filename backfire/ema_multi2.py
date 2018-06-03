@@ -9,9 +9,6 @@ import time
 
 # runs the entiry backtets for this set of date with all the possible combinations
 def backtest_set(raw_data, start_date, end_date):
-    day_df, df = ema.prep_data(raw_data, start_date, end_date)
-    df = df[['close', 'timestamp']]
-    
     principle = 35000
     principle_split = principle / 2
     principle_usd = principle # principle_split
@@ -45,6 +42,14 @@ def backtest_set(raw_data, start_date, end_date):
     threshold_hodl_diff = 0.1
     threshold_fills = 5
     
+    # fix the start time for ema to unfold
+    ema_length = pd.DataFrame(windows).max() #find the biggest window size
+    start_time_fixed = ema.get_start_time_for_ema(ema_length, start_time)
+
+    # prep data
+    day_df, df = ema.prep_data(raw_data, start_date, end_date)
+    df = df[['close', 'timestamp']]
+
     my_result_type = 'backtest'
     start = time.time()
     rois = []

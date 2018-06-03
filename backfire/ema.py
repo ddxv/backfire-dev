@@ -64,24 +64,21 @@ def run_backtest(df, desired_outputs, bt):
     bal.set_usd(bt.principle_usd)
     fills = []
     for row in list(zip(df['timestamp'], df['close'], df['buy_signal'], df['sell_signal'])):
-        fill_time = pd.to_datetime(row[0])
-        #ignore result below our origina start time:
-        if (fill_time > pd.to_datetime(bt.start_date)):
-            price = row[1]
-            if row[2] == 1 and (bal.usd * bt.buy_pct_usd) > bt.min_usd:
-                value_usd = bal.usd * bt.buy_pct_usd
-                value_btc = value_usd / price
-                value_btc = value_btc - (value_btc * .001)
-                bal.add_btc(value_btc)
-                bal.sub_usd(value_usd)
-                fills.append(create_fill(fill_time, 'buy', price, value_btc, value_usd))
-            if row[3] == 1 and (bal.btc * bt.sell_pct_btc) > bt.min_btc:
-                value_btc = bal.btc * bt.sell_pct_btc
-                value_usd = price * value_btc
-                value_usd = value_usd - (value_usd * .001)
-                bal.add_usd(value_usd)
-                bal.sub_btc(value_btc)
-                fills.append(create_fill(fill_time, 'sell', price, value_btc, value_usd))
+        price = row[1]
+        if row[2] == 1 and (bal.usd * bt.buy_pct_usd) > bt.min_usd:
+            value_usd = bal.usd * bt.buy_pct_usd
+            value_btc = value_usd / price
+            value_btc = value_btc - (value_btc * .001)
+            bal.add_btc(value_btc)
+            bal.sub_usd(value_usd)
+            fills.append(create_fill(row[0], 'buy', price, value_btc, value_usd))
+        if row[3] == 1 and (bal.btc * bt.sell_pct_btc) > bt.min_btc:
+            value_btc = bal.btc * bt.sell_pct_btc
+            value_usd = price * value_btc
+            value_usd = value_usd - (value_usd * .001)
+            bal.add_usd(value_usd)
+            bal.sub_btc(value_btc)
+            fills.append(create_fill(row[0], 'sell', price, value_btc, value_usd))
     num_fills = len(fills)
     result = {
             "n_fills": num_fills,
@@ -115,12 +112,10 @@ def create_fill(my_time, my_side, btc_price, btc_val, usd_val):
 # the formula is: start_time - (base_length * ema_period_lenght) as minutes
 # we should probably do a check here somewhere in the future to prevent times in the past which
 # are beyond our available data set.
-def get_start_time_for_ema(bt, start_time):
+def get_start_time_for_ema(ema_length, start_time):
 	# base multiplier for our ema length
 	base_length = 100 
-	# find the bigger of the two period windws (upper or lower?)
-	ema_length = bt.upper_window if bt.upper_window > bt.lower_window else bt.lower_window
-
+	
 	# start date is offset into the past by the ema length * base length
 	new_start = datetime.strptime(start_time, "%Y-%m-%d") - pd.DateOffset(minutes=(ema_length * base_length))
 
@@ -144,6 +139,8 @@ def single_backtest(df, bt):
     hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
 
     df = ema_logic.set_signals(df, bt)
+    # trim results and ignore fills below on our start date:
+    df = df[pd.to_datetime(df.timestamp) > pd.to_datetime(bt.start_date)] 
     results, my_fills = run_backtest(df, 'both', bt)
     my_fills = fills_running_bal(my_fills, bt)
     results['hodl_roi'] = hodl_roi
