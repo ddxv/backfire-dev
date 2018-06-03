@@ -1,4 +1,6 @@
 import logging
+import mysql_prices as ms
+import pandas as pd
 logger = logging.getLogger(__name__)
 
 def append_if_new(my_id, df, table_name):
@@ -85,7 +87,30 @@ def update_sql_orders(new_order_ids, stale_order_ids):
         append_if_new('trade_id', fills_df, table_name)
         gdax_delete_open_orders(stale_order_ids, stale_hist)
 
-def select_all_from(my_table):
+def avail_balances(bot_id, base_symbol, quote_symbol):
     engine = ms.connect_mysql()
-    df = pd.read_sql(sql = f'SELECT * FROM {my_table}', con = engine)
-    return(df)
+    bal_df = pd.read_sql(sql = f"SELECT * FROM gdax_bot_bal WHERE bot_id = '{bot_id}'", con = engine)
+    sell_hold = pd.read_sql(sql = f"""SELECT (sum(base_amt) - sum(filled_amt)) as base_hold
+            FROM gdax_order_cur
+            WHERE bot_id = '{bot_id}' and side = 'sell'
+            GROUP BY bot_id
+            """, con = engine)
+    buy_hold = pd.read_sql(sql = f"""SELECT (base_amt*price) as quote_amt, filled_amt
+            FROM gdax_order_cur
+            WHERE bot_id = '{bot_id}' and side = 'sell'
+            """, con = engine)
+    if len(sell_hold) > 0:
+        base_hold = sell_hold['base_hold'].sum()
+    else:
+        base_hold = 0
+    if len(buy_hold) > 0:
+        #TODO: How is filled_amt handled? is that in base or quote?
+        quote_hold = buy_hold['quote_amt'].sum()
+    else:
+        quote_hold = 0
+    avail_base = bal_df[base_symbol.lower()][0] - base_hold
+    avail_quote = bal_df[quote_symbol.lower()][0] - quote_hold
+    return(avail_base, avail_quote)
+
+
+

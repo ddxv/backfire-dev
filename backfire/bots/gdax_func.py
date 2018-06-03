@@ -2,14 +2,24 @@ import gdax
 import json
 import logging
 import mysql_prices as ms
+from os.path import expanduser
 import pandas as pd
+import backfire.bots.bot_db as db
 logger = logging.getLogger(__name__)
 
-def initialize_gdax(test_bool):
-    gdax_auth = json.load(open('/home/bitnami/auth/gdax'))
+def load_gdax_auth(test_bool):
+    home = expanduser("~")
+    if test_bool == True:
+        gdax_auth = json.load(open(f'{home}/auth/gdax_sb'))
+    if test_bool == False:
+        gdax_auth = json.load(open(f'{home}/auth/gdax'))
     key = gdax_auth['key']
     secret = gdax_auth['secret']
     passphrase = gdax_auth['passphrase']
+    return(key, secret, passphrase)
+
+def initialize_gdax(test_bool):
+    key, secret, passphrase = load_gdax_auth(test_bool)
     if test_bool == True:
         logger.info("Initialize GDAX Sandbox API")
         ac = gdax.AuthenticatedClient(key, secret, passphrase,
@@ -62,6 +72,11 @@ def update_gdax_transfers_manual(ac):
     transfer_df = transfer_df.rename(columns = {'amount': 'transfer_amt', 'id': 'trade_id'})
     transfer_df = transfer_df[['transfer_amt', 'created_at', 'cur', 'trade_id', 'transfer_id', 'transfer_type', 'bot_id']]
     transfer_df['created_at'] = pd.to_datetime(transfer_df['created_at'])
-    append_if_new('transfer_id', transfer_df, 'gdax_transfer_hist')
+    db.append_if_new('transfer_id', transfer_df, 'gdax_transfer_hist')
 
+def get_price(symbol_pair):
+    gdax_public = gdax.PublicClient()
+    last_price = gdax_public.get_product_ticker(product_id = symbol_pair)['price']
+    last_price = float(last_price)
+    return(last_price)
 

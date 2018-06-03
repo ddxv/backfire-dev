@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import mysql_prices as ms
 from time import sleep
-from backfire.bots.gdax_func import get_gdax_stale_new
-from backfire.bots.bot_db import update_sql_orders
+from backfire.bots.gdax_func import get_gdax_stale_new, get_price
+from backfire.bots.bot_db import update_sql_orders, avail_balances
 import ema_logic
 import logging
 logger = logging.getLogger(__name__)
@@ -23,8 +23,8 @@ def check_signals(bot_vars, output):
     if output == 'df':
         return(df)
 
-def check_signal_loop(ac, bot_vars, base, quote):
-    symbol_pair = f'{base}-{quote}'
+def check_signal_loop(ac, bot_vars, base_symbol, quote_symbol):
+    symbol_pair = f'{base_symbol}-{quote_symbol}'
     while True:
         # Loops until signal is hit ?
         buy_signal, sell_signal = check_signals(bot_vars, 'signals')
@@ -33,19 +33,23 @@ def check_signal_loop(ac, bot_vars, base, quote):
             update_db(ac)
             avail_base, avail_quote = avail_balances(bot_vars.bot_id, base_symbol, quote_symbol)
             # TODO: Min xxx should be based on the base, Lookup?
-            if buy_signal > 0 and (avail_quote * bot_vars.buy_pct_usd) > bot_vars.min_usd:
-                new_order = place_order(ac, symbol_pair, 'buy', bot_vars, avail_base, avail_quote)
-                sleep(120)
-                update_db(ac)
-                #return new_order
+            if buy_signal > 0:
+                if (avail_quote * bot_vars.buy_pct_usd) > bot_vars.min_usd:
+                    new_order = place_order(ac, symbol_pair, 'buy', bot_vars, avail_base, avail_quote)
+                    sleep(120)
+                    update_db(ac)
+                    #return new_order
+                else:
+                    logger.warning(f'{bot_vars.bot_id}: Insufficient funds: {base_symbol}: {avail_base}, {quote_symbol}: {avail_quote}')
             # TODO: Min xxx should be based on the base, Lookup?
-            if sell_signal > 0 and (avail_base * bot_vars.sell_pct_usd) > bot_vars.min_btc:
-                new_order = place_order(ac, symbol_pair, 'sell', bot_vars, avail_base, avail_quote)
-                sleep(120)
-                update_db(ac)
-                #return new_order
-            else:
-                logger.warning(f'{bot_vars.bot_id}: Insufficient funds: {base_symbol}TC: {base_bal}, {quote_symbol}: {quote_bal}')
+            if sell_signal > 0:
+                if (avail_base * bot_vars.sell_pct_btc) > bot_vars.min_btc:
+                    new_order = place_order(ac, symbol_pair, 'sell', bot_vars, avail_base, avail_quote)
+                    sleep(120)
+                    update_db(ac)
+                    #return new_order
+                else:
+                    logger.warning(f'{bot_vars.bot_id}: Insufficient funds: {base_symbol}: {avail_base}, {quote_symbol}: {avail_quote}')
                 sleep(120)
         sleep(15)
 
@@ -57,21 +61,20 @@ def strf_float(my_float, digits):
     return(my_str)
 
 def place_order(ac, symbol_pair, side, bot_vars, avail_base, avail_quote):
-    gdax_public = gdax.PublicClient()
-    last_price = gdax_public.get_product_ticker(product_id = symbol_pair)['price']
-    last_price = float(last_price)
+    print(f"availbase,{avail_base}")
+    last_price = get_price(symbol_pair)
     # Maagggic numbbbberrrr, avoid market orders but get still filled
-    limit_fee = .001 * last_price
+    limit_size = -.01 * last_price
     if side == 'sell':
-        limit_price = last_price + limit_fee
-        total_quote_amt = (avail_quote * bot_vars.pct_buy_usd)
+        limit_price = last_price + limit_size
+        total_quote_amt = (avail_quote * bot_vars.buy_pct_usd)
     if side == 'buy':
-        limit_price = last_price - limit_fee
-        total_quote_amt = (avail_base * bot_vars.pct_buy_btc)
+        limit_price = last_price - limit_size
+        total_quote_amt = (avail_base * bot_vars.buy_pct_usd)
     final_quote_amt = total_quote_amt - (total_quote_amt * bot_vars.gdax_fee_pct)
     base_amt = final_quote_amt / limit_price
-    base_amt_str = strf_btc(base_amt, 8)
-    limit_price_str = strf_bid(limit_price, 2)
+    base_amt_str = strf_float(base_amt, 8)
+    limit_price_str = strf_float(limit_price, 2)
     result = None
     if side == 'buy':
         while type(result) is not dict:
@@ -97,31 +100,5 @@ def place_order(ac, symbol_pair, side, bot_vars, avail_base, avail_quote):
 def update_db(ac):
     new_order_ids, stale_order_ids = get_gdax_stale_new(ac)
     update_sql_orders(new_order_ids, stale_order_ids)
-
-
-def avail_balances(bot_id, base_symbol, quote_symbol):
-    bal_df = pd.read_sql(sql = f"SELECT * FROM gdax_bot_bal WHERE bot_id = '{bot_id}'", con = engine)
-    sell_hold = pd.read_sql(sql = f"""SELECT (sum(base_amt) - sum(filled_amt)) as base_hold
-            FROM gdax_order_cur
-            WHERE bot_id = '{bot_id}' and side = 'sell'
-            GROUP BY bot_id
-            """, con = engine)
-    buy_hold = pd.read_sql(sql = f"""SELECT (base_amt*price) as quote_amt, filled_amt
-            FROM gdax_order_cur
-            WHERE bot_id = '{bot_id}' and side = 'sell'
-            """, con = engine)
-    if len(sell_hold) > 0:
-        base_hold = sell_hold['base_hold'].sum()
-    else:
-        base_hold = 0
-    if len(buy_hold) > 0:
-        #TODO: How is filled_amt handled? is that in base or quote?
-        quote_hold = buy_hold['quote_amt'].sum()
-    else:
-        quote_hold = 0
-    avail_base = bal_df[base_symbol.lower()][0] - base_hold
-    avail_quote = bal_df[quote_symbol.lower()][0] - quote_hold
-    return(avail_base, avail_quote)
-
 
 

@@ -37,5 +37,9 @@ class EMASettings:
     min_btc = 0
     def set_min_btc(self, val):
         self.min_btc = val
+    gdax_fee_pct = 0
+    def set_gdax_fee_pct(self, val):
+        self.gdax_fee_pct = val
+
 
 
