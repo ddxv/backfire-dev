@@ -92,8 +92,8 @@ def add_vectorized_cols(df, rois_df, bt_vars, start_date, end_date):
 raw_data = pd.read_csv('~/backfire/data/resources/Bitfinex_BTCUSD_1min_2017-11-20_to_2018-06-03.csv')
 #raw_data = pd.read_csv('~/backfire/data/resources/Bitfinex_ETHUSD_1min_2017-12-14_to_2018-05-30.csv')
 
-test_name = 'tobi_BTC_bitfinex_3_days'
-start_date = "2018-06-01"
+test_name = 'tobi_BTC_bitfinex_1_day'
+start_date = "2018-06-02"
 end_date = "2018-06-03"
 result_sets = []
 

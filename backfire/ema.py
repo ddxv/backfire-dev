@@ -140,7 +140,7 @@ def single_backtest(df, bt):
 
     df = ema_logic.set_signals(df, bt)
     # trim results and ignore fills below on our start date:
-    df = df[pd.to_datetime(df.timestamp) > pd.to_datetime(bt.start_date)] 
+    df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)] 
     results, my_fills = run_backtest(df, 'both', bt)
     my_fills = fills_running_bal(my_fills, bt)
     results['hodl_roi'] = hodl_roi
@@ -159,6 +159,8 @@ def run_multi(df, my_result_type, bt, my_data):
     bt.set_sell_pct_btc(my_data[5])
     
     df = ema_logic.set_signals(df, bt)
+    # trim results and ignore fills below on our start date:
+    df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)] 
     df = df[(df['sell_signal']==1) | (df['buy_signal'] == 1)]
     result = run_backtest(df, my_result_type, bt)
     return(result)
