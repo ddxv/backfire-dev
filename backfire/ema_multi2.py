@@ -29,7 +29,7 @@ def backtest_set(raw_data, start_date, end_date):
 
 #    windows = [10,20,40,60,80,100,140,160,200,300,400,500,600,700,800,1000,2000]
 #    windows = [20,40,60,80,100,150,200,300,400,500,600,700,800]
-    windows = [4,8,12,16,20,25,30,40,50,60,70,80,90,100]
+    windows = [4,8,12,16,20,25,30,40,50,60,70,80,90,100,200,400,600,1000]
     upper_windows = windows
     lower_windows = windows
 
@@ -43,11 +43,11 @@ def backtest_set(raw_data, start_date, end_date):
     threshold_fills = 5
     
     # fix the start time for ema to unfold
-    ema_length = pd.DataFrame(windows).max() #find the biggest window size
-    start_time_fixed = ema.get_start_time_for_ema(ema_length, start_time)
+    ema_length = int(pd.DataFrame(windows).max()) #find the biggest window size
+    start_time_fixed = ema.get_start_time_for_ema(ema_length, start_date)
 
     # prep data
-    day_df, df = ema.prep_data(raw_data, start_date, end_date)
+    day_df, df = ema.prep_data(raw_data, start_time_fixed, end_date)
     df = df[['close', 'timestamp']]
 
     my_result_type = 'backtest'
@@ -89,12 +89,12 @@ def add_vectorized_cols(df, rois_df, bt_vars, start_date, end_date):
 
 
 #raw_data = pd.read_csv('~/backfire/data/resources/coinbase_fixed_2017-01-01_current.csv')
-raw_data = pd.read_csv('~/backfire/data/resources/Bitfinex_BTCUSD_1min_2017-11-20_to_2018-05-30.csv')
+raw_data = pd.read_csv('~/backfire/data/resources/Bitfinex_BTCUSD_1min_2017-11-20_to_2018-06-03.csv')
 #raw_data = pd.read_csv('~/backfire/data/resources/Bitfinex_ETHUSD_1min_2017-12-14_to_2018-05-30.csv')
 
-test_name = 'tobi_BTC_bitfinex_lowN_5months'
-start_date = "2018-01-01"
-end_date = "2018-05-30"
+test_name = 'tobi_BTC_bitfinex_3_days'
+start_date = "2018-06-01"
+end_date = "2018-06-03"
 result_sets = []
 
 rois = backtest_set(raw_data, start_date, end_date)

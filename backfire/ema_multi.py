@@ -36,11 +36,11 @@ def backtest_set(raw_data, start_date, end_date):
     upper_factor_pcts = factor_pcts
     
     # fix the start time for ema to unfold
-    ema_length = pd.DataFrame(windows).max() #find the biggest window size
-    start_time_fixed = ema.get_start_time_for_ema(ema_length, start_time)
+    ema_length = int(pd.DataFrame(windows).max()) #find the biggest window size
+    start_time_fixed = ema.get_start_time_for_ema(ema_length, start_date)
 
     # prep data
-    day_df, df = ema.prep_data(raw_data, start_date, end_date)
+    day_df, df = ema.prep_data(raw_data, start_time_fixed, end_date)
     df = df[['close', 'timestamp']]
 
     my_result_type = 'backtest'
