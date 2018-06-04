@@ -13,13 +13,15 @@ def backtest_set(raw_data, start_date, end_date):
     principle_split = principle / 2
     principle_usd = principle # principle_split
     principle_btc = 0 # principle_split / df[0:1]['close'].values[0]
-    
+
     bt_vars = ema.BacktestSettings()
     bt_vars.set_min_btc(.001)
     bt_vars.set_min_usd(100)
     bt_vars.set_principle_usd(principle_usd)
     bt_vars.set_principle_btc(principle_btc)
-    
+    bt_vars.set_start_date(start_date)
+    bt_vars.set_end_date(end_date)
+
 #    pcts = [0.01, 0.05, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0]
     pcts = [0.5, 1.0]
     sell_pcts = pcts
@@ -29,7 +31,7 @@ def backtest_set(raw_data, start_date, end_date):
 
 #    windows = [10,20,40,60,80,100,140,160,200,300,400,500,600,700,800,1000,2000]
 #    windows = [20,40,60,80,100,150,200,300,400,500,600,700,800]
-    windows = [4,8,12,16,20,25,30,40,50,60,70,80,90,100,200,400,600,1000]
+    windows = [10,12,16,20,25,30,40,50,60,70,80,90,100,200,400,600,1000, 2000]
     upper_windows = windows
     lower_windows = windows
 

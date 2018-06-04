@@ -21,7 +21,9 @@ def backtest_set(raw_data, start_date, end_date):
     bt_vars.set_min_usd(100)
     bt_vars.set_principle_usd(principle_usd)
     bt_vars.set_principle_btc(principle_btc)
-    
+    bt_vars.set_start_date(start_date)
+    bt_vars.set_end_date(end_date) 
+
     pcts = [(2 ** x) / 1000 for x in range(4, 11)]
     pcts = [1 if x > 1 else x for x in pcts]
     sell_pcts = pcts
