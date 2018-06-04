@@ -4,5 +4,6 @@
 __pycache__
 
 data/*
-ema_logic.py
+*_logic.py
 notes.py
+*.log
