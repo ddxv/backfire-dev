@@ -3,6 +3,8 @@ import ema_logic
 import numpy as np
 from datetime import datetime
 from datetime import timedelta
+import logging
+logger = logging.getLogger(__name__)
 
 class AccountBalances:
     usd = 0
@@ -175,6 +177,6 @@ def fills_running_bal(fills_df, bt):
         fills_df['bal_usd'] = fills_df.usd_val.cumsum() + bt.principle_usd
         fills_df['running_bal'] = (fills_df['bal_btc'] * fills_df['price']) + fills_df['bal_usd']
     else:
-        print("WARNING: Fills DataFrame is empty")
+        logger.warning(f'Fills DataFrame is empty')
     return(fills_df)
 
