@@ -157,7 +157,7 @@ def run_multi(df, my_result_type, bt, my_data):
     bt.set_factor_low(my_data[3])
     bt.set_buy_pct_usd(my_data[4])
     bt.set_sell_pct_btc(my_data[5])
-    
+
     df = ema_logic.set_signals(df, bt)
     # trim results and ignore fills below on our start date:
     df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)] 
