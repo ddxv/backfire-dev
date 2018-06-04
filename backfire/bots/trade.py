@@ -61,18 +61,16 @@ def strf_float(my_float, digits):
     return(my_str)
 
 def place_order(ac, symbol_pair, side, bot_vars, avail_base, avail_quote):
-    print(f"availbase,{avail_base}")
+    print(f"availbase,{avail_base}, availquote,{avail_quote}")
     last_price = get_price(symbol_pair)
     # Maagggic numbbbberrrr, avoid market orders but get still filled
     limit_size = -.01 * last_price
     if side == 'sell':
         limit_price = last_price + limit_size
-        total_quote_amt = (avail_quote * bot_vars.buy_pct_usd)
+        base_amt = (avail_base * bot_vars.sell_pct_btc)
     if side == 'buy':
         limit_price = last_price - limit_size
-        total_quote_amt = (avail_base * bot_vars.buy_pct_usd)
-    final_quote_amt = total_quote_amt - (total_quote_amt * bot_vars.gdax_fee_pct)
-    base_amt = final_quote_amt / limit_price
+        base_amt = (avail_quote * bot_vars.buy_pct_usd) / limit_price
     base_amt_str = strf_float(base_amt, 8)
     limit_price_str = strf_float(limit_price, 2)
     result = None
@@ -87,14 +85,15 @@ def place_order(ac, symbol_pair, side, bot_vars, avail_base, avail_quote):
                 sleep(1)
     if side == 'sell':
         while type(result) is not dict:
-            result = ac.sell(price = limit_price, #USD
-                size = base_amt, #BTC
+            result = ac.sell(price = limit_price_str, #USD
+                size = base_amt_str, #BTC
                 product_id = symbol_pair,
                 time_in_force = 'GTT',
                 cancel_after = 'hour')
             if result is not dict:
                 sleep(1)
     logger.info(f'{symbol_pair}: {side}, base_amt: {base_amt_str}, quote_price: {limit_price_str}')
+    print(result)
     return(result)
 
 def update_db(ac):
