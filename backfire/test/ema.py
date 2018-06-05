@@ -64,6 +64,7 @@ class BacktestSettings:
 def run_backtest(df, desired_outputs, bt):
     bal = AccountBalances()
     bal.set_usd(bt.principle_usd)
+    bal.set_btc(bt.principle_btc)
     fills = []
     for row in list(zip(df['timestamp'], df['close'], df['buy_signal'], df['sell_signal'])):
         price = row[1]
