@@ -4,9 +4,31 @@ import numpy as np
 from datetime import datetime
 from datetime import timedelta
 import logging
+import numpy as np
 logger = logging.getLogger(__name__)
 
 class AccountBalances:
+    """ AccountBalances manages btc/usd balances used in run_backest
+    contains functions for subtract / add / set for each currency
+
+    Functions
+    ---------
+    def sub_cur(self, val)
+        subtracts the val from the cur
+
+    def add_cur(self, val)
+        adds the val from the cur
+
+    def set_cur(self, val)
+        sets the val from the cur
+
+    Parameters
+    ----------
+    btc : numerical, default 0
+                    Balance of BTC
+    usd : numerical, default 0
+                    Balance of USD
+    """
     usd = 0
     btc = 0
     def sub_btc(self, btc_amt):
@@ -61,7 +83,23 @@ class BacktestSettings:
         self.end_date = val
 
 
-def run_backtest(df, desired_outputs, bt):
+def run_backtest(df, desired_outputs = "both", bt):
+    """ run_backtest loops over the rows of buys and sells in df.
+    It calculates buys and sells and keeps a running balance of inputs. 
+    Outputs a simplified dictionary of the results 
+    or a DataFrame of all successfull fills.
+    
+    ----------
+    df : DataFrame, 
+                    Only needs to be buy and sells with other data removed
+                    to increase speed
+    desired_outputs: string, default "both"
+                    Toggles simple dictionary of results or 
+                    df of fill data
+    bt : Class: BacktestSettings(),
+                    Contatins all required variables for running backest
+    """
+    run_back
     bal = AccountBalances()
     bal.set_usd(bt.principle_usd)
     bal.set_btc(bt.principle_btc)
@@ -85,13 +123,13 @@ def run_backtest(df, desired_outputs, bt):
     num_fills = len(fills)
     result = {
             "n_fills": num_fills,
-            "upper_window": bt.upper_window, 
+            "upper_window": bt.upper_window,
             "lower_window": bt.lower_window,
-            "upper_factor": bt.factor_high, 
+            "upper_factor": bt.factor_high,
             "lower_factor": bt.factor_low,
             "buy_pct_usd": bt.buy_pct_usd,
-            "sell_pct_btc": bt.sell_pct_btc, 
-            "usd_bal": bal.usd, 
+            "sell_pct_btc": bt.sell_pct_btc,
+            "usd_bal": bal.usd,
             "btc_bal": bal.btc
             }
     if desired_outputs == "both":
@@ -116,34 +154,29 @@ def create_fill(my_time, my_side, btc_price, btc_val, usd_val):
 # we should probably do a check here somewhere in the future to prevent times in the past which
 # are beyond our available data set.
 def get_start_time_for_ema(ema_length, start_time):
-	# base multiplier for our ema length
-	base_length = 100 
-	
-	# start date is offset into the past by the ema length * base length
-	new_start = datetime.strptime(start_time, "%Y-%m-%d") - pd.DateOffset(minutes=(ema_length * base_length))
-
-	# return the new date as a str
-	return str(new_start)
+        # base multiplier for our ema length
+        base_length = 100 
+        # start date is offset into the past by the ema length * base length
+        new_start = datetime.strptime(start_time, "%Y-%m-%d") - pd.DateOffset(minutes=(ema_length * base_length))
+        # return the new date as a str
+        return str(new_start)
 
 
 def prep_data(raw_data, start_time, end_time):
-    #raw_data = pd.read_csv('~/coinbase_data.csv')
-    raw_data['timestamp'] = pd.to_datetime(raw_data.timestamp)
+    raw_data['timestamp'] = raw_data.timestamp
     trimmed_df = raw_data[raw_data.timestamp >= start_time]
     trimmed_df = trimmed_df[trimmed_df.timestamp <= end_time]
     trimmed_df = trimmed_df.reset_index(drop = True)
     day_df = trimmed_df.groupby(trimmed_df['timestamp'].dt.date).agg({'open':'first',  'high': max, 'low': min, 'close':'last',}).reset_index()
     return(day_df, trimmed_df)
 
-
 def single_backtest(df, bt):
     final_close = df.tail(2)[0:1]['close'].values[0]
     hodl_usd = (bt.principle_usd / df[0:1]['close'].values[0]) * final_close
     hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
-
     df = ema_logic.set_signals(df, bt)
     # trim results and ignore fills below on our start date:
-    df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)] 
+    df = df[df.timestamp >= pd.to_datetime(bt.start_date)] 
     results, my_fills = run_backtest(df, 'both', bt)
     my_fills = fills_running_bal(my_fills, bt)
     results['hodl_roi'] = hodl_roi
@@ -153,19 +186,34 @@ def single_backtest(df, bt):
     results['roi'] = (results['final_bal'] - bt.principle_usd) / bt.principle_usd
     return(df, results, my_fills)
 
-def run_multi(df, my_result_type, bt, my_data):
+
+#df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)]
+def run_multi(df, result_type, bt, my_data):
+    """ run_multi runs parrellized backtests on a iterable my_data
+    it adds logic from ema_logic which sets buy & sell signals.
+    These signals are sent as a df to run_backtest
+    The output of run_multi is the result from run_backtest
+
+    Parameters
+    ----------
+    df : pd.DataFrame, must contain 'close' and 'timestamp' columns
+    result_type: for multi it musts be 'both'
+    bt : BacktestSettings() Class, a base is passed in,
+                remaining values are filled in from my_data
+    my_data : a product matrix of all possible variables to be run
+            order in which values are put into the my_data represents their 
+            index
+    """
     bt.set_upper_window(my_data[0])
     bt.set_lower_window(my_data[1])
     bt.set_factor_high(my_data[2])
     bt.set_factor_low(my_data[3])
     bt.set_buy_pct_usd(my_data[4])
     bt.set_sell_pct_btc(my_data[5])
-
     df = ema_logic.set_signals(df, bt)
-    # trim results and ignore fills below on our start date:
-    df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)] 
+    df = df[df.timestamp >= bt.start_date]
     df = df[(df['sell_signal']==1) | (df['buy_signal'] == 1)]
-    result = run_backtest(df, my_result_type, bt)
+    result = run_backtest(df, result_type, bt)
     return(result)
 
 def fills_running_bal(fills_df, bt):
