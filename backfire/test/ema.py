@@ -83,7 +83,7 @@ class BacktestSettings:
         self.end_date = val
 
 
-def run_backtest(df, desired_outputs = "both", bt):
+def run_backtest(df, desired_outputs, bt):
     """ run_backtest loops over the rows of buys and sells in df.
     It calculates buys and sells and keeps a running balance of inputs. 
     Outputs a simplified dictionary of the results 
@@ -99,7 +99,6 @@ def run_backtest(df, desired_outputs = "both", bt):
     bt : Class: BacktestSettings(),
                     Contatins all required variables for running backest
     """
-    run_back
     bal = AccountBalances()
     bal.set_usd(bt.principle_usd)
     bal.set_btc(bt.principle_btc)
@@ -197,6 +196,8 @@ def run_multi(df, result_type, bt, my_data):
     Parameters
     ----------
     df : pd.DataFrame, must contain 'close' and 'timestamp' columns
+        timestamp: pandas datetime object
+        close: numerical
     result_type: for multi it musts be 'both'
     bt : BacktestSettings() Class, a base is passed in,
                 remaining values are filled in from my_data
