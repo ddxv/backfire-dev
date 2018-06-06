@@ -1,3 +1,5 @@
+from multiprocessing import Pool
+from functools import partial
 import pandas as pd
 import ema_logic
 import numpy as np
@@ -29,8 +31,11 @@ class AccountBalances:
     usd : numerical, default 0
                     Balance of USD
     """
-    usd = 0
-    btc = 0
+    # __init__ will initiate new class each time
+    def __init__(self, p_usd, p_btc):
+        self.usd = p_usd
+        self.btc = p_btc
+
     def sub_btc(self, btc_amt):
         self.btc -= btc_amt
     def sub_usd(self, usd_amt):
@@ -45,6 +50,13 @@ class AccountBalances:
         self.btc = new_bal
 
 class BacktestSettings:
+    def __init__(self):
+        self.principle_btc = 0
+        self.principle_usd = 0
+    def set_principle_btc(self, val):
+        self.principle_btc = val
+    def set_principle_usd(self, val):
+        self.principle_usd = val
     upper_window = 0
     def set_upper_window(self, val):
         self.upper_window = val
@@ -63,12 +75,6 @@ class BacktestSettings:
     sell_pct_btc = 0
     def set_sell_pct_btc(self, val):
         self.sell_pct_btc = val
-    principle_btc = 0
-    def set_principle_btc(self, val):
-        self.principle_btc = val
-    principle_usd = 0
-    def set_principle_usd(self, val):
-        self.principle_usd = val
     min_usd = 0
     def set_min_usd(self, val):
         self.min_usd = val
@@ -99,13 +105,11 @@ def run_backtest(df, desired_outputs, bt):
     bt : Class: BacktestSettings(),
                     Contatins all required variables for running backest
     """
-    bal = AccountBalances()
-    bal.set_usd(bt.principle_usd)
-    bal.set_btc(bt.principle_btc)
+    bal = AccountBalances(bt.principle_usd, bt.principle_btc)
     fills = []
     for row in list(zip(df['timestamp'], df['close'], df['buy_signal'], df['sell_signal'])):
         price = row[1]
-        if row[2] == 1 and (bal.usd * bt.buy_pct_usd) > bt.min_usd:
+        if row[2] == 1 and ((bal.usd * bt.buy_pct_usd) > bt.min_usd):
             value_usd = bal.usd * bt.buy_pct_usd
             value_btc = value_usd / price
             value_btc = value_btc - (value_btc * .001)
@@ -169,24 +173,32 @@ def prep_data(raw_data, start_time, end_time):
     day_df = trimmed_df.groupby(trimmed_df['timestamp'].dt.date).agg({'open':'first',  'high': max, 'low': min, 'close':'last',}).reset_index()
     return(day_df, trimmed_df)
 
-def single_backtest(df, bt):
+def add_vectorized_cols(df, results, bt_vars):
+    results['sd'] = bt_vars.start_date
+    results['ed'] = bt_vars.end_date
+    first_close = df[0:1]['close'].values[0]
     final_close = df.tail(2)[0:1]['close'].values[0]
-    hodl_usd = (bt.principle_usd / df[0:1]['close'].values[0]) * final_close
-    hodl_roi = (hodl_usd - bt.principle_usd) / bt.principle_usd
-    df = ema_logic.set_signals(df, bt)
-    # trim results and ignore fills below on our start date:
-    df = df[df.timestamp >= pd.to_datetime(bt.start_date)] 
-    results, my_fills = run_backtest(df, 'both', bt)
-    my_fills = fills_running_bal(my_fills, bt)
+    hodl_btc_total = (bt_vars.principle_usd / first_close) + bt_vars.principle_btc
+    total_usd_principle = hodl_btc_total * first_close
+    hodl_usd_final = hodl_btc_total * final_close
+    hodl_roi = (hodl_usd_final - total_usd_principle) / total_usd_principle
     results['hodl_roi'] = hodl_roi
-    results['sd'] = bt.start_date# df.timestamp.min()
-    results['ed'] = bt.end_date # df.timestamp.max()
     results['final_bal'] = results['usd_bal'] + (final_close * results['btc_bal'])
-    results['roi'] = (results['final_bal'] - bt.principle_usd) / bt.principle_usd
+    results['roi'] = (results['final_bal'] - total_usd_principle) / total_usd_principle
+    return(results)
+
+
+def single_backtest(df, bt_vars):
+    df = ema_logic.set_signals(df, bt_vars)
+    # trim results and ignore fills below on our start date:
+    df = df[df.timestamp >= pd.to_datetime(bt_vars.start_date)]
+    df = df[df.timestamp <= pd.to_datetime(bt_vars.end_date)]
+    results, my_fills = run_backtest(df, 'both', bt_vars)
+    my_fills = fills_running_bal(my_fills, bt_vars)
+    results = add_vectorized_cols(df, results, bt_vars)
     return(df, results, my_fills)
 
 
-#df = df[pd.to_datetime(df.timestamp) >= pd.to_datetime(bt.start_date)]
 def run_multi(df, result_type, bt, my_data):
     """ run_multi runs parrellized backtests on a iterable my_data
     it adds logic from ema_logic which sets buy & sell signals.
@@ -202,20 +214,32 @@ def run_multi(df, result_type, bt, my_data):
     bt : BacktestSettings() Class, a base is passed in,
                 remaining values are filled in from my_data
     my_data : a product matrix of all possible variables to be run
-            order in which values are put into the my_data represents their 
-            index
+            order in which values are put into the my_data 
+            represents their index
     """
     
+    rois = []
+    with Pool(8) as p:
+        my_partial_func = partial(parralized_backtest, df, result_type, bt)
+        result_list = p.map(my_partial_func, my_data)
+        rois.append(result_list)
+    rois_df = pd.DataFrame(rois)
+    rois_df = pd.concat([pd.DataFrame(d) for d in rois]).reset_index(drop = True)
+    rois_df = add_vectorized_cols(df, rois_df, bt)
+    return(rois_df)
+
+
+def parralized_backtest(df, result_type, bt, my_data):
     bt.set_upper_window(my_data[0])
     bt.set_lower_window(my_data[1])
     bt.set_factor_high(my_data[2])
     bt.set_factor_low(my_data[3])
     bt.set_buy_pct_usd(my_data[4])
     bt.set_sell_pct_btc(my_data[5])
-    
+
     df = ema_logic.set_signals(df, bt)
     df = df[df.timestamp >= bt.start_date]
-    
+    df = df[df.timestamp <= bt.end_date]
     df = df[(df['sell_signal']==1) | (df['buy_signal'] == 1)]
     result = run_backtest(df, result_type, bt)
     return(result)
