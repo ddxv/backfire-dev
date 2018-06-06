@@ -205,14 +205,17 @@ def run_multi(df, result_type, bt, my_data):
             order in which values are put into the my_data represents their 
             index
     """
+    
     bt.set_upper_window(my_data[0])
     bt.set_lower_window(my_data[1])
     bt.set_factor_high(my_data[2])
     bt.set_factor_low(my_data[3])
     bt.set_buy_pct_usd(my_data[4])
     bt.set_sell_pct_btc(my_data[5])
+    
     df = ema_logic.set_signals(df, bt)
     df = df[df.timestamp >= bt.start_date]
+    
     df = df[(df['sell_signal']==1) | (df['buy_signal'] == 1)]
     result = run_backtest(df, result_type, bt)
     return(result)
