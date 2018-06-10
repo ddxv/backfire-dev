@@ -1,7 +1,6 @@
 from multiprocessing import Pool
 from functools import partial
 import pandas as pd
-import ema_logic
 import numpy as np
 from datetime import datetime
 from datetime import timedelta
@@ -39,6 +38,7 @@ Functions
     def __init__(self, p_btc, p_usd):
         self.usd = p_usd
         self.btc = p_btc
+
 
 class BacktestSettings:
     def __init__(self):
@@ -81,7 +81,7 @@ class BacktestSettings:
 
 
 def run_backtest(df, desired_outputs, bt):
-    """ run_backtest loops over the rows of buys and sells in df.
+    """ run_backtest loops over the rows of buys and sells in df. 
     It calculates buys and sells and keeps a running balance of inputs. 
     Outputs a simplified dictionary of the results 
     or a DataFrame of all successfull fills.
@@ -157,7 +157,6 @@ def get_start_time_for_ema(ema_length, start_time):
 
 
 def prep_data(raw_data, start_time, end_time):
-    raw_data['timestamp'] = raw_data.timestamp
     trimmed_df = raw_data[raw_data.timestamp >= start_time]
     trimmed_df = trimmed_df[trimmed_df.timestamp <= end_time]
     trimmed_df = trimmed_df.reset_index(drop = True)
@@ -167,8 +166,12 @@ def prep_data(raw_data, start_time, end_time):
 def add_vectorized_cols(df, results, bt_vars):
     results['sd'] = bt_vars.start_date
     results['ed'] = bt_vars.end_date
+    results['p_usd'] = bt_vars.principle_usd
+    results['p_btc'] = bt_vars.principle_btc
     first_close = df[0:1]['close'].values[0]
     final_close = df.tail(2)[0:1]['close'].values[0]
+    results['open'] = first_close
+    results['close'] = final_close
     hodl_btc_total = (bt_vars.principle_usd / first_close) + bt_vars.principle_btc
     total_usd_principle = hodl_btc_total * first_close
     hodl_usd_final = hodl_btc_total * final_close
@@ -180,10 +183,18 @@ def add_vectorized_cols(df, results, bt_vars):
 
 
 def single_backtest(df, bt_vars):
-    df = ema_logic.set_signals(df, bt_vars)
-    # trim results and ignore fills below on our start date:
-    df = df[df.timestamp >= pd.to_datetime(bt_vars.start_date)]
-    df = df[df.timestamp <= pd.to_datetime(bt_vars.end_date)]
+    lw = bt_vars.lower_window
+    uw = bt_vars.upper_window
+    lf = bt_vars.factor_low
+    uf = bt_vars.factor_high
+    lower_window = f'lower_{lw}_{lf}'
+    upper_window = f'upper_{uw}_{uf}'
+    # TODO: Can these trimming be moved to prep data?
+    #df = df[df.timestamp >= pd.to_datetime(bt_vars.start_date)]
+    #df = df[df.timestamp <= pd.to_datetime(bt_vars.end_date)]
+    df[lower_window] = df.close.ewm(span=lw, adjust = False).mean() * (1 - lf)
+    df[upper_window] = df.close.ewm(span=uw, adjust = False).mean() * (uf + 1)
+    df = ema_crosses(df, lower_window, upper_window)
     results, my_fills = run_backtest(df, 'both', bt_vars)
     my_fills = fills_running_bal(my_fills, bt_vars)
     results = add_vectorized_cols(df, results, bt_vars)
@@ -192,7 +203,7 @@ def single_backtest(df, bt_vars):
 
 def run_multi(df, result_type, bt, my_data):
     """ run_multi runs parrellized backtests on a iterable my_data
-    it adds logic from ema_logic which sets buy & sell signals.
+    and sets buy & sell signals.
     These signals are sent as a df to run_backtest
     The output of run_multi is the result from run_backtest
 
@@ -218,6 +229,11 @@ def run_multi(df, result_type, bt, my_data):
     return(res_df)
 
 
+def ema_crosses(df, lower_window, upper_window):
+    df['buy_signal'] = np.where(((df.close < df[lower_window]) & (df.close.shift(1) > df[lower_window].shift(1))), 1, 0)
+    df['sell_signal'] = np.where(((df.close > df[upper_window]) & (df.close.shift(1) < df[upper_window].shift(1))), 1, 0)
+    return(df)
+
 def parralized_backtest(df, result_type, bt, my_data):
     bt.upper_window = my_data[0]
     bt.lower_window = my_data[1]
@@ -225,10 +241,11 @@ def parralized_backtest(df, result_type, bt, my_data):
     bt.factor_low = my_data[3]
     bt.buy_pct_usd = my_data[4]
     bt.sell_pct_btc = my_data[5]
-    df = ema_logic.set_signals(df, bt)
-    df = df[df.timestamp >= bt.start_date]
-    df = df[df.timestamp <= bt.end_date]
-    df = df[(df['sell_signal']==1) | (df['buy_signal'] == 1)]
+    # trim results and ignore fills below on our start date:
+    upper_window = f'upper_{bt.upper_window}_{bt.factor_high}'
+    lower_window = f'lower_{bt.lower_window}_{bt.factor_low}'
+    df = ema_crosses(df, lower_window, upper_window)
+    df = df[(df['sell_signal'] == 1) | (df['buy_signal'] == 1)]
     result = run_backtest(df, result_type, bt)
     return(result)
 
@@ -236,8 +253,10 @@ def fills_running_bal(fills_df, bt):
     if len(fills_df) > 0:
         fills_df['p_usd'] = bt.principle_usd
         fills_df['p_btc'] = bt.principle_btc
-        fills_df['btc_val'] = np.where(fills_df['side'] == 'sell', fills_df['btc_val'] * -1, fills_df['btc_val'])
-        fills_df['usd_val'] = np.where(fills_df['side'] == 'buy', fills_df['usd_val'] * -1, fills_df['usd_val'])
+        fills_df['btc_val'] = np.where(fills_df['side'] == 'sell',
+                fills_df['btc_val'] * -1, fills_df['btc_val'])
+        fills_df['usd_val'] = np.where(fills_df['side'] == 'buy',
+                fills_df['usd_val'] * -1, fills_df['usd_val'])
         fills_df['bal_btc'] = fills_df.btc_val.cumsum() + bt.principle_btc
         fills_df['bal_usd'] = fills_df.usd_val.cumsum() + bt.principle_usd
         fills_df['running_bal'] = (fills_df['bal_btc'] * fills_df['price']) + fills_df['bal_usd']
