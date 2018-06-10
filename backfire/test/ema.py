@@ -155,7 +155,6 @@ def get_start_time_for_ema(ema_length, start_time):
         # return the new date as a str
         return str(new_start)
 
-
 def prep_data(raw_data, start_time, end_time):
     trimmed_df = raw_data[raw_data.timestamp >= start_time]
     trimmed_df = trimmed_df[trimmed_df.timestamp <= end_time]
@@ -202,9 +201,9 @@ def single_backtest(df, bt_vars):
 
 
 def run_multi(df, result_type, bt, my_data):
-    """ run_multi runs parrellized backtests on a iterable my_data
+    """ run_multi runs parallelized backtests on a iterable my_data
     and sets buy & sell signals.
-    These signals are sent as a df to run_backtest
+    These signals are sent as ang df to run_backtest
     The output of run_multi is the result from run_backtest
 
     Parameters
@@ -221,7 +220,7 @@ def run_multi(df, result_type, bt, my_data):
     """
     res_list = []
     with Pool(8) as p:
-        my_partial_func = partial(parralized_backtest, df, result_type, bt)
+        my_partial_func = partial(parallelized_backtest, df, result_type, bt)
         result_list = p.map(my_partial_func, my_data)
         res_list.append(result_list)
     res_df = pd.concat([pd.DataFrame(d) for d in res_list]).reset_index(drop = True)
@@ -234,7 +233,7 @@ def ema_crosses(df, lower_window, upper_window):
     df['sell_signal'] = np.where(((df.close > df[upper_window]) & (df.close.shift(1) < df[upper_window].shift(1))), 1, 0)
     return(df)
 
-def parralized_backtest(df, result_type, bt, my_data):
+def parallelized_backtest(df, result_type, bt, my_data):
     bt.upper_window = my_data[0]
     bt.lower_window = my_data[1]
     bt.factor_high = my_data[2]
