@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import mysql_prices as ms
 from time import sleep
-from backfire.bots.gdax_func import get_gdax_stale_new, get_price
-from backfire.bots.bot_db import update_sql_orders, avail_balances
+from backfire.bots.gdax_func import get_price, update_orders
+from backfire.bots.bot_db import avail_balances
 import ema_logic
 import logging
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ def place_order(ac, symbol_pair, side, bot_vars, avail_base, avail_quote):
     return(result)
 
 def update_db(ac):
-    new_order_ids, stale_order_ids = get_gdax_stale_new(ac)
-    update_sql_orders(new_order_ids, stale_order_ids)
+    update_orders(ac)
+    #new_order_ids, stale_order_ids = get_gdax_stale_new(ac)
 
 
