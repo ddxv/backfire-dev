@@ -22,15 +22,13 @@ def initialize_gdax(test_bool):
     key, secret, passphrase = load_gdax_auth(test_bool)
     if test_bool == True:
         logger.info("Initialize GDAX Sandbox API")
-        print('db1',bot_db.db.my_db)
         bot_db.db.my_db = 'gdax_test'
         bot_db.db.set_engine()
-        print('db2',bot_db.db.my_db)
         ac = gdax.AuthenticatedClient(key, secret, passphrase,
                 api_url="https://api-public.sandbox.gdax.com")
     if test_bool == False:
         logger.info("Initialize live GDAX API")
-        bot_db.db.my_db = 'gdax_test'
+        bot_db.db.my_db = 'gdax'
         bot_db.db.set_engine()
         ac = gdax.AuthenticatedClient(key, secret, passphrase)
     return(ac)
@@ -51,7 +49,6 @@ def update_orders(ac):
         gdax_order_ids = orders_df['order_id'].tolist()
     else:
         gdax_order_ids = gdax_orders
-    #engine = db.connect_mysql()
     sql_order_ids = bot_db.get_cur_orders()
     new_order_ids = set(gdax_order_ids) - set(sql_order_ids['order_id'])
     stale_order_ids = set(sql_order_ids['order_id']) - set(gdax_order_ids)
@@ -70,7 +67,6 @@ def update_orders(ac):
 
 
 def update_gdax_transfers_manual(ac):
-    print('db3',bot_db.db.my_db)
     bot_id = 'manual'
     signal_id = 'manual'
     my_accounts = ac.get_accounts()

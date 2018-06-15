@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 logger = logging.getLogger(__name__)
 
 def get_cur_orders():
-    cur_orders = pd.read_sql(sql = f'SELECT order_id from gdax_order_cur', con = engine)
+    cur_orders = pd.read_sql(sql = f'SELECT order_id from gdax_order_cur', con = db.engine)
     return(cur_orders)
 
 
@@ -20,30 +20,18 @@ class ConnectDB():
         my_user = json.loads(secret)['user']
         my_pass = json.loads(secret)['pass']
         try:
-            logger.info("Connecting to MySQL database: {self.my_db}")
+            logger.info(f'Connecting to MySQL database: {self.my_db}')
             self.engine = create_engine(f'mysql://{my_user}:{my_pass}@127.0.0.1:3306/{self.my_db}', echo=False)
         except Exception as error:
-            logger.error("Error in class ConnectDB(): {error}")
+            logger.error(f'Error in class ConnectDB(): {error}')
             self.my_db = None
     # Engine has no close, only engine.connect()
     #def __del__(self):
     #    self.engine.close()
 
 
-def connect_mysql(my_db):
-    home = expanduser("~")
-    # MySQL user and pass stored as text json
-    secret = open(f'{home}/auth/mysql.auth','r').read()
-    my_user = json.loads(secret)['user']
-    my_pass = json.loads(secret)['pass']
-    # MySQL sqlalchemy engine, connecting to my_db
-    engine = create_engine(f'mysql://{my_user}:{my_pass}@127.0.0.1:3306/{my_db}', echo=False)
-    return(engine)
-
 
 def append_if_new(my_id, df, table_name):
-    print('db4',db.my_db)
-    #engine = connect_mysql()
     my_ids = pd.read_sql(sql = f'SELECT {my_id} from {table_name}', con = db.engine)
     my_ids = my_ids[my_id].tolist()
     new_rows = df[~df[my_id].isin(my_ids)]
@@ -93,16 +81,15 @@ def prep_gdax_order_df(orders_list):
     return(orders_df)
 
 def gdax_delete_open_orders(order_ids, stale_hist):
-    #engine = connect_mysql()
     order_ids_str = ', '.join("'{0}'".format(w) for w in order_ids)
-    engine.execute(f"DELETE FROM gdax_order_cur WHERE order_id in ({order_ids_str})")
+    db.engine.execute(f"DELETE FROM gdax_order_cur WHERE order_id in ({order_ids_str})")
     append_if_new('order_id', stale_hist, 'gdax_order_hist')
 
 
 def reset_db(ac):
     # ONLY MANUAL BOT ID
     #### RESET DB
-    my_db = 'test'
+    my_db = 'gdax_test'
     update_gdax_transfers(ac)
     fills_df = get_gdax_fills(ac)
     # Should be done programatticallyin bot
@@ -116,17 +103,16 @@ def reset_db(ac):
 
 
 def avail_balances(bot_id, base_symbol, quote_symbol):
-    #engine = connect_mysql()
-    bal_df = pd.read_sql(sql = f"SELECT * FROM gdax_bot_bal WHERE bot_id = '{bot_id}'", con = engine)
+    bal_df = pd.read_sql(sql = f"SELECT * FROM gdax_bot_bal WHERE bot_id = '{bot_id}'", con = db.engine)
     sell_hold = pd.read_sql(sql = f"""SELECT (sum(base_amt) - sum(filled_amt)) as base_hold
             FROM gdax_order_cur
             WHERE bot_id = '{bot_id}' and side = 'sell'
             GROUP BY bot_id
-            """, con = engine)
+            """, con = db.engine)
     buy_hold = pd.read_sql(sql = f"""SELECT (base_amt*price) as quote_amt, filled_amt
             FROM gdax_order_cur
             WHERE bot_id = '{bot_id}' and side = 'sell'
-            """, con = engine)
+            """, con = db.engine)
     if len(sell_hold) > 0:
         base_hold = sell_hold['base_hold'].sum()
     else:
