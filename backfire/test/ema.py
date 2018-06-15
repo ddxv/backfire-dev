@@ -203,7 +203,7 @@ def single_backtest(df, bt_vars):
 def run_multi(df, result_type, bt, my_data):
     """ run_multi runs parallelized backtests on a iterable my_data
     and sets buy & sell signals.
-    These signals are sent as ang df to run_backtest
+    These signals are sent as a df to run_backtest
     The output of run_multi is the result from run_backtest
 
     Parameters
