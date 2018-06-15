@@ -1,7 +1,5 @@
 use gdax_test;
 
-create database gdax;
-
 drop table if exists 
 gdax_order_cur,
 gdax_order_hist,
@@ -104,13 +102,17 @@ primary key (bot_id)
 
 create table
 gdax_transfer_hist (
-transfer_amt decimal(20,16) not null,
+transfer_amt decimal(24,16) not null,
 created_at timestamp(5) not null,
 cur VARCHAR(4) not null,
-trade_id VARCHAR(64) not null,
+trade_id VARCHAR(64) null,
 transfer_id VARCHAR(64) not null,
 transfer_type VARCHAR(20) not null,
 bot_id VARCHAR(20) not null,
 primary key (transfer_id)
 );
+
+
+
+
 
