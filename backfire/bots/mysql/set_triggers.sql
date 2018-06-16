@@ -116,5 +116,3 @@ for each row
 INSERT INTO gdax_order_aff
         (order_id, bot_id) values (new.order_id, new.bot_id);
 $$
-
-
