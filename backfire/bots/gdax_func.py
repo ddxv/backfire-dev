@@ -1,3 +1,4 @@
+import numpy as np
 import gdax
 import json
 import logging
@@ -34,7 +35,7 @@ def initialize_gdax(test_bool):
     return(ac)
 
 
-def gdax_get_orders(uniq_orders):
+def gdax_get_orders(ac, uniq_orders):
     order_list = []
     for o in uniq_orders:
         order = ac.get_order(o)
@@ -58,12 +59,13 @@ def update_orders(ac):
         bot_db.append_if_new('order_id', new_orders_df, 'gdax_order_cur')
     # Remove old
     if len(stale_order_ids) > 0:
-        stale_hist = gdax_get_orders(stale_order_ids)
+        stale_hist = gdax_get_orders(ac, stale_order_ids)
         stale_hist = pd.DataFrame(stale_hist)
-        stale_hist = prep_gdax_order_hist(stale_hist)
+        stale_hist = bot_db.prep_gdax_order_df(stale_hist)
         fills_df = get_gdax_fills(ac)
-        bot_db.append_if_new('trade_id', fills_df, table_name)
-        gdax_delete_open_orders(stale_order_ids, stale_hist)
+        fills_df = add_bot_ids(fills_df)
+        bot_db.append_if_new('trade_id', fills_df, 'gdax_fill_hist')
+        bot_db.gdax_delete_open_orders(stale_order_ids, stale_hist)
 
 
 def update_gdax_transfers_manual(ac):
@@ -88,6 +90,24 @@ def update_gdax_transfers_manual(ac):
     transfer_df = transfer_df[['transfer_amt', 'created_at', 'cur', 'trade_id', 'transfer_id', 'transfer_type', 'bot_id']]
     transfer_df['created_at'] = pd.to_datetime(transfer_df['created_at'])
     bot_db.append_if_new('transfer_id', transfer_df, 'gdax_transfer_hist')
+
+def add_bot_ids(fills_df):
+    aff = bot_db.get_order_aff()
+    fills_df = pd.merge(fills_df, aff, how='left', left_on='order_id', right_on='order_id').fillna('bot_test')
+    return(fills_df)
+
+def get_gdax_fills(ac):
+    gdax_fills = ac.get_fills()
+    flat_list = [item for sublist in gdax_fills for item in sublist]
+    fills_df = pd.DataFrame(flat_list)
+    fills_df = fills_df.rename(columns = {'product_id': 'symbol_pair', 'size': 'base_amt', 'usd_volume': 'amt_usd'})
+    fills_df['base_symbol'] = fills_df.symbol_pair.str.split('-').str[0]
+    fills_df['quote_symbol'] = fills_df.symbol_pair.str.split('-').str[1]
+    fills_df['quote_amt'] = pd.to_numeric(fills_df['base_amt']) * pd.to_numeric(fills_df['price'])
+    fills_df['quote_amt_inc_fee'] = np.where((fills_df.quote_symbol == 'USD') & (fills_df.side == 'sell'), fills_df['quote_amt'] - pd.to_numeric(fills_df['fee']), fills_df['quote_amt'])
+    fills_df['quote_amt_inc_fee'] = np.where((fills_df.quote_symbol == 'USD') & (fills_df.side == 'buy'), fills_df['quote_amt_inc_fee'] + pd.to_numeric(fills_df['fee']), fills_df['quote_amt_inc_fee'])
+    fills_df['created_at'] = pd.to_datetime(fills_df['created_at'])
+    return(fills_df)
 
 def get_price(symbol_pair):
     gdax_public = gdax.PublicClient()
